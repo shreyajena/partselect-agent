@@ -1,0 +1,29 @@
+# macOS cruft
+.DS_Store
+
+# Python caches / compiled files
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+venv/
+.venv/
+backend/.venv/
+
+# Local data artifacts
+*.sqlite3
+*.db
+backend/instalily.db
+backend/chroma_db/
+backup_data/
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE / editor metadata
+.idea/
+.vscode/
+.env
