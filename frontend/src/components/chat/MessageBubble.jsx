@@ -1,11 +1,14 @@
 import './ChatWidget.css';
 import ProductCard from './ProductCard';
+import OrderCard from './OrderCard';
 import LinkButtons from './LinkButtons';
 
 const MessageBubble = ({ message, onPrompt }) => {
   const metadata = message.metadata || {};
   const productMeta =
     metadata.type === 'product_info' ? metadata.product : null;
+  const orderMeta =
+    metadata.type === 'order_info' ? metadata.order : null;
   const linksMeta = metadata.type === 'links' ? metadata.links : null;
 
   // Split content by newlines for better formatting
@@ -28,6 +31,11 @@ const MessageBubble = ({ message, onPrompt }) => {
           {productMeta && (
             <div className="message-metadata">
               <ProductCard product={productMeta} onPrompt={onPrompt} />
+            </div>
+          )}
+          {orderMeta && (
+            <div className="message-metadata">
+              <OrderCard order={orderMeta} onPrompt={onPrompt} />
             </div>
           )}
           {linksMeta && (

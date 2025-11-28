@@ -398,7 +398,7 @@ def handle_compat_check(decision: RouteDecision, db: Session) -> dict:
 #  ORDER SUPPORT (QUERY DATABASE)
 # =====================================================================
 
-def handle_order_support(decision: RouteDecision, db: Session) -> str:
+def handle_order_support(decision: RouteDecision, db: Session) -> dict:
     """
     Simple order support handler for dummy data.
     Handles: "Track order #1", "What did I order last?", "Was my return accepted?"
@@ -429,22 +429,62 @@ def handle_order_support(decision: RouteDecision, db: Session) -> str:
             part = db.query(Part).filter(Part.part_id == order.part_id).first() if order.part_id else None
             transaction = db.query(Transaction).filter(Transaction.order_id == order_id).first()
             
-            lines = [f"Order #{order.order_id}: {order.order_status.title()}"]
+            # Build context for LLM
+            context_parts = [f"Order #{order.order_id}"]
+            context_parts.append(f"Status: {order.order_status.title()}")
             if part:
-                lines.append(f"Part: {part.part_name}")
+                context_parts.append(f"Part: {part.part_name} (ID: {part.part_id})")
             if transaction:
-                lines.append(f"Amount: ${transaction.amount}")
+                context_parts.append(f"Amount: ${transaction.amount}")
+                context_parts.append(f"Payment status: {transaction.status}")
             if order.shipping_type:
-                lines.append(f"Shipping: {order.shipping_type}")
-            return "\n".join(lines)
-        return f"Order #{order_id} not found."
+                context_parts.append(f"Shipping: {order.shipping_type}")
+            if order.order_date:
+                context_parts.append(f"Order date: {order.order_date.strftime('%B %d, %Y')}")
+            if order.return_eligible:
+                context_parts.append("Return eligible: Yes")
+            
+            context = "\n".join(context_parts)
+            
+            system_prompt = """
+You are helping a customer with their PartSelect order.
+The order details are provided in the context below.
+Keep your response brief (1-2 sentences) and conversational.
+Acknowledge the order status naturally based on what the user asked.
+Since the order card will show all details, keep the text reply concise and friendly.
+"""
+            
+            # Generate contextual reply
+            reply_text = llm_answer(system_prompt, decision.normalized_query, context)
+            
+            # Return with metadata for order card
+            metadata = {
+                "type": "order_info",
+                "order": {
+                    "id": order.order_id,
+                    "status": order.order_status,
+                    "date": order.order_date.isoformat() if order.order_date else None,
+                    "shippingType": order.shipping_type,
+                    "partName": part.part_name if part else None,
+                    "partId": part.part_id if part else None,
+                    "partUrl": part.product_url if part else None,
+                    "amount": str(transaction.amount) if transaction else None,
+                    "transactionStatus": transaction.status if transaction else None,
+                    "returnEligible": order.return_eligible,
+                },
+            }
+            return {"reply": reply_text, "metadata": metadata}
+        return {"reply": f"Order #{order_id} not found.", "metadata": None}
     
     # "What did I order last?" - requires order ID
     if any(p in query_lower for p in ["last order", "my order", "what did i order"]):
-        return (
-            "To check your orders, please provide your order number.\n"
-            "For example: 'Track order #1' or 'What is the status of order #2?'"
-        )
+        return {
+            "reply": (
+                "To check your orders, please provide your order number.\n"
+                "For example: 'Track order #1' or 'What is the status of order #2?'"
+            ),
+            "metadata": None
+        }
     
     # "Was my return accepted?" - requires order ID
     if "return" in query_lower or "refund" in query_lower:
@@ -453,23 +493,29 @@ def handle_order_support(decision: RouteDecision, db: Session) -> str:
             if order and order.order_status == "returned":
                 txn = db.query(Transaction).filter(Transaction.order_id == order_id).first()
                 if txn and txn.status == "refunded":
-                    return f"Yes, your return for order #{order_id} was accepted. Refund: ${txn.amount}"
-                return f"Return for order #{order_id} is being processed."
+                    return {"reply": f"Yes, your return for order #{order_id} was accepted. Refund: ${txn.amount}", "metadata": None}
+                return {"reply": f"Return for order #{order_id} is being processed.", "metadata": None}
             elif order:
-                return f"Order #{order_id} is not marked as returned."
+                return {"reply": f"Order #{order_id} is not marked as returned.", "metadata": None}
             else:
-                return f"Order #{order_id} not found."
+                return {"reply": f"Order #{order_id} not found.", "metadata": None}
         
-        return (
-            "To check your return status, please provide your order number.\n"
-            "For example: 'Was my return accepted for order #3?'"
-        )
+        return {
+            "reply": (
+                "To check your return status, please provide your order number.\n"
+                "For example: 'Was my return accepted for order #3?'"
+            ),
+            "metadata": None
+        }
     
     # Fallback
-    return (
-        "I can help with order tracking. Please provide your order number.\n"
-        "For example: 'Track order #1' or 'What is the status of order #2?'"
-    )
+    return {
+        "reply": (
+            "I can help with order tracking. Please provide your order number.\n"
+            "For example: 'Track order #1' or 'What is the status of order #2?'"
+        ),
+        "metadata": None
+    }
 
 
 
