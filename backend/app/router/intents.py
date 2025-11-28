@@ -7,12 +7,12 @@ from typing import List, Optional
 
 
 class Intent(str, Enum):
-    REPAIR_HELP = "repair_help"              # “dishwasher leaking”, “ice maker not working”
-    COMPAT_CHECK = "compat_check"            # “is PS11752778 compatible with WDT780SAEM1?”
-    PRODUCT_INFO = "product_info"            # “tell me about PS11752778”
-    BLOG_HOWTO = "blog_howto"                # “what is eco cycle?”, “how to reset bosch dishwasher”
-    ORDER_SUPPORT = "order_support"          # “where is my order?”, “can I return this?”
-    POLICY = "policy"                        # “why shop at partselect?”, “return policy?”              # “thanks”, “you’re great”, “hi”
+    REPAIR_HELP = "repair_help"              # "dishwasher leaking", "ice maker not working"
+    COMPAT_CHECK = "compat_check"            # "is PS11752778 compatible with WDT780SAEM1?"
+    PRODUCT_INFO = "product_info"            # "tell me about PS11752778"
+    BLOG_HOWTO = "blog_howto"                # "what is eco cycle?", "how to reset bosch dishwasher"
+    ORDER_SUPPORT = "order_support"          # "where is my order?", "can I return this?"
+    POLICY = "policy"                        # "why shop at partselect?", "return policy?"              # "thanks", "you're great", "hi"
     OUT_OF_SCOPE = "out_of_scope"            # microwaves, random Qs, etc.
     CLARIFICATION = "clarification"          # we need more info first
 

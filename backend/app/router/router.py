@@ -60,19 +60,31 @@ def extract_order_id(text: str) -> Optional[str]:
     - "order 83"
     - "track order 123"
     - "order number 456"
+    - "order number is #4"
+    - "orderid #3"
     """
-    # Try the standard pattern first
-    m = re.search(ORDER_ID_REGEX, text.lower())
+    text_lower = text.lower()
+    
+    # Try "order number is #X" or "order number #X"
+    m = re.search(r"order\s+number\s+(?:is\s+)?#?\s*(\d{1,6})", text_lower)
     if m:
         return m.group(1)
     
-    # Try "order number X" or "order X" (standalone number after "order")
-    m = re.search(r"order\s+(?:number\s+)?(\d{1,6})", text.lower())
+    # Try "orderid #X" or "order id #X"
+    m = re.search(r"order\s*id\s*#?\s*(\d{1,6})", text_lower)
     if m:
         return m.group(1)
     
-    # Try standalone number that might be an order ID (context-dependent)
-    # This is less reliable, so we'll be conservative
+    # Try the standard pattern "order #X"
+    m = re.search(ORDER_ID_REGEX, text_lower)
+    if m:
+        return m.group(1)
+    
+    # Try "order X" (standalone number after "order")
+    m = re.search(r"order\s+(\d{1,6})", text_lower)
+    if m:
+        return m.group(1)
+    
     return None
 
 
@@ -124,11 +136,11 @@ def route_intent(user_message: str) -> RouteDecision:
         )
 
     # -----------------------------
-    # 2. ORDER SUPPORT (fuzzy)
+    # 2. ORDER SUPPORT (when order_id present or order-related keywords)
     # -----------------------------
     if order_id or any(
         k in msg
-        for k in ["order", "ordr", "oder", "oroder", "tracking", "track shipment", "track", "shipment", "shipping", "my order", "order status", "refund my", "my return", "return status", "is my return"]
+        for k in ["order", "ordr", "oder", "oroder", "tracking", "track shipment", "track", "shipment", "shipping", "my order", "order status", "refund my", "my return", "return status", "is my return", "return my order", "need to return"]
     ):
         return RouteDecision(
             intent=Intent.ORDER_SUPPORT,

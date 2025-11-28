@@ -8,11 +8,21 @@ import psLogo from '../../assets/ps-logo.svg';
 const QUICK_ACTIONS = [
   {
     id: 'repair',
-    label: 'Need repair help',
-    starterText: 'Tell me what\'s wrong with your refrigerator or dishwasher and I\'ll help you diagnose the issue or find the right repair steps.',
+    label: 'Get repair help',
+    starterText: "Tell me what's wrong with your refrigerator or dishwasher and I'll help you diagnose the issue or find the right repair steps.",
     examples: [
-      'My Whirlpool fridge ice maker stopped working. What part do I need?',
-      'My dishwasher is leaking water. What do I do?'
+      'The ice maker on my Whirlpool fridge is not working. How can I fix it?',
+      'My dishwasher is leaking from the bottom. What do I do?'
+      
+    ],
+  },
+  {
+    id: 'compatible',
+    label: 'Find compatible parts',
+    starterText: 'Give me your model number (e.g., WDT780SAEM1) and I\'ll show you parts that are guaranteed to fit.',
+    examples: [
+      'Is PS11752778 compatible with Whirlpool WDT780SAEM1?',
+      'Does WPW10321304 fit my fridge?',
     ],
   },
   {
@@ -21,26 +31,18 @@ const QUICK_ACTIONS = [
     starterText: 'Share your order number and I can help you check status, shipping details, or returns.',
     examples: [
       'What is the status of order #2?',
-      'Help me track Order #1",
+      'Help me track Order #1',
     ],
   },
   {
-    id: 'compatible',
-    label: 'Find compatible parts',
-    starterText: 'Give me your model number (e.g., WDT780SAEM1) and I\'ll show you parts that are guaranteed to fit.',
+    id: 'usage',
+    label: 'How do I use this?',
+    starterText: 'Ask me about dishwasher or refrigerator cycles, settings, or usage tips, and I’ll explain what they do based on PartSelect guides.',
     examples: [
-      'Is part PS11752778 compatible with my model?',
-      'What parts can be replaced for part PS11752778?',
+      'What is eco mode on a dishwasher?',
+      'How do I reset my refrigerator?',
     ],
-  },
-  {
-    id: 'place',
-    label: 'Help me place an order',
-    starterText: 'Tell me which part you\'re looking for or describe the issue. I\'ll recommend the part and guide you through checkout.',
-    examples: [
-      'I need a replacement door gasket for Whirlpool WRF560SEHZ00.'
-    ],
-  },
+  }
 ];
 
 const ChatWindow = ({ isExpanded, setIsExpanded, onClose }) => {
