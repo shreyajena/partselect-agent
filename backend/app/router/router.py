@@ -54,8 +54,26 @@ def extract_mpn(text: str) -> Optional[str]:
 
 
 def extract_order_id(text: str) -> Optional[str]:
+    """
+    Extract order ID from text. Handles:
+    - "order #83"
+    - "order 83"
+    - "track order 123"
+    - "order number 456"
+    """
+    # Try the standard pattern first
     m = re.search(ORDER_ID_REGEX, text.lower())
-    return m.group(1) if m else None
+    if m:
+        return m.group(1)
+    
+    # Try "order number X" or "order X" (standalone number after "order")
+    m = re.search(r"order\s+(?:number\s+)?(\d{1,6})", text.lower())
+    if m:
+        return m.group(1)
+    
+    # Try standalone number that might be an order ID (context-dependent)
+    # This is less reliable, so we'll be conservative
+    return None
 
 
 def extract_appliance_type(text: str) -> Optional[str]:
@@ -93,28 +111,24 @@ def route_intent(user_message: str) -> RouteDecision:
         missing_fields=[],
     )
 
-    # # -----------------------------
-    # # 1. SMALL TALK (short, no IDs)
-    # # -----------------------------
-    # small_talk_keywords = ["hi", "hello", "thanks", "thank you", "hey"]
-    # looks_like_small_talk = any(re.search(rf"\b{k}\b", msg) for k in small_talk_keywords)
-
-    # if looks_like_small_talk and len(msg.split()) <= 4 and not (
-    #     part_id or model_number or manufacturer_part_number or order_id
-    # ):
-    #     return RouteDecision(
-    #         intent=Intent.SMALL_TALK,
-    #         normalized_query=user_message,
-    #         metadata=metadata,
-    #         debug_reason="small_talk",
-    #     )
+    # -----------------------------
+    # 1. POLICY (check before order support to catch "return policy" etc.)
+    # Only match explicit policy questions, not order return status
+    # -----------------------------
+    if any(k in msg for k in ["return policy", "return window", "policy", "why shop", "warranty", "guarantee", "shipping policy", "price match"]):
+        return RouteDecision(
+            intent=Intent.POLICY,
+            normalized_query=user_message,
+            metadata=metadata,
+            debug_reason="policy",
+        )
 
     # -----------------------------
     # 2. ORDER SUPPORT (fuzzy)
     # -----------------------------
     if order_id or any(
         k in msg
-        for k in ["order", "ordr", "oder", "oroder", "tracking", "track shipment", "track"]
+        for k in ["order", "ordr", "oder", "oroder", "tracking", "track shipment", "track", "shipment", "shipping", "my order", "order status", "refund my", "my return", "return status", "is my return"]
     ):
         return RouteDecision(
             intent=Intent.ORDER_SUPPORT,
@@ -123,19 +137,8 @@ def route_intent(user_message: str) -> RouteDecision:
             debug_reason="order_support",
         )
 
-   # # -----------------------------
-    # # 3. POLICY
-    # # -----------------------------
-    # if any(k in msg for k in ["return policy", "return window", "policy", "why shop", "warranty"]):
-    #     return RouteDecision(
-    #         intent=Intent.POLICY,
-    #         normalized_query=user_message,
-    #         metadata=metadata,
-    #         debug_reason="policy",
-    #     )
-
     # -----------------------------
-    # 4. COMPATIBILITY CHECK
+    # 3. COMPATIBILITY CHECK
     # -----------------------------
     compat_keywords = ["compatible", "fit", "work with"]
     if any(k in msg for k in compat_keywords):
@@ -173,7 +176,7 @@ def route_intent(user_message: str) -> RouteDecision:
         )
 
     # -----------------------------
-    # 6. REPAIR HELP (symptoms)
+    # 4. REPAIR HELP (symptoms)
     # -----------------------------
     repair_keywords = [
         "leak", "leaking",
@@ -199,7 +202,7 @@ def route_intent(user_message: str) -> RouteDecision:
         )
 
     # -----------------------------
-    # 7. BLOG HOW-TO / USAGE
+    # 5. BLOG HOW-TO / USAGE
     # -----------------------------
     howto_keywords = [
         "how to", "how do i",
@@ -218,7 +221,7 @@ def route_intent(user_message: str) -> RouteDecision:
         )
 
     # -----------------------------
-    # 8. OUT OF SCOPE
+    # 6. OUT OF SCOPE
     # -----------------------------
     return RouteDecision(
         intent=Intent.OUT_OF_SCOPE,

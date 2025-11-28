@@ -1,10 +1,11 @@
 from __future__ import annotations
 import logging
+import time
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.models import Part, PartModelMapping, Model
+from app.models import Part, PartModelMapping, Model, User, Order, Transaction
 from app.rag.retrieval import retrieve_documents
 from app.llm.client import get_chat_client, get_default_model
 from app.router.intents import RouteDecision
@@ -25,13 +26,14 @@ If you are unsure, say so and point the user to the relevant PartSelect page.
 
 
 # =====================================================================
-#  ONE FAST, SIMPLE LLM CALL HELPER
+#  ONE FAST, SIMPLE LLM CALL HELPER WITH RETRY LOGIC
 # =====================================================================
 
-def llm_answer(system_prompt: str, user_prompt: str, context: str = "") -> str:
+def llm_answer(system_prompt: str, user_prompt: str, context: str = "", max_retries: int = 3) -> str:
     """
     Shared helper for all LLM calls (DeepSeek or OpenAI).
     Applies a global style + task-specific instructions + optional CONTEXT.
+    Includes retry logic with exponential backoff for transient errors.
     """
     full_system = GLOBAL_STYLE + "\n\n" + system_prompt.strip()
 
@@ -44,12 +46,40 @@ def llm_answer(system_prompt: str, user_prompt: str, context: str = "") -> str:
 
     logger.debug("LLM messages: %s", messages)
 
-    completion = get_chat_client().chat.completions.create(
-        model=get_default_model(),
-        messages=messages,
-        temperature=0.5,
+    client = get_chat_client()
+    model = get_default_model()
+    
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            completion = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0.5,
+            )
+            response = completion.choices[0].message.content
+            if not response or not response.strip():
+                raise ValueError("Empty response from LLM")
+            return response
+        except Exception as e:
+            last_error = e
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                logger.warning(
+                    f"LLM call failed (attempt {attempt + 1}/{max_retries}): {e}. "
+                    f"Retrying in {wait_time}s..."
+                )
+                time.sleep(wait_time)
+            else:
+                logger.error(f"LLM call failed after {max_retries} attempts: {e}")
+    
+    # Fallback response if all retries fail
+    error_msg = str(last_error) if last_error else "Unknown error"
+    logger.error(f"All LLM retries exhausted. Last error: {error_msg}")
+    return (
+        "I'm having trouble processing that right now. "
+        "Please try again in a moment, or visit PartSelect.com for immediate assistance."
     )
-    return completion.choices[0].message.content
 
 
 # =====================================================================
@@ -64,36 +94,50 @@ def _rag_answer(decision: RouteDecision, preferred_source: str) -> str:
     )
     logger.info("RAG retrieved %d docs for source=%s", len(docs), preferred_source)
 
+    # Define repair URLs
+    REPAIR_URL = "https://www.partselect.com/Repair/"
+    INSTANT_REPAIRMAN_URL = "https://www.partselect.com/Instant-Repairman/"
+
     if not docs:
         # fallback when vector store is empty or miss
         return (
             "I couldn't find enough local repair information for that. "
-            "You can get detailed step-by-step help on PartSelect’s repair pages: "
-            "https://www.partselect.com/Repair/ or the Instant Repairman tool: "
-            "https://www.partselect.com/Instant-Repairman/."
+            f"You can get detailed step-by-step help on PartSelect's repair pages: "
+            f"{REPAIR_URL} or the Instant Repairman tool: {INSTANT_REPAIRMAN_URL}"
         )
 
     context = "\n\n---\n\n".join([d["text"] for d in docs])
 
     system_prompt = """
-You are helping with either repair troubleshooting or usage/maintenance,
-depending on what the context describes.
+You are helping with repair troubleshooting for refrigerators and dishwashers ONLY.
 
-If the context clearly describes a repair for this symptom:
-- List 2–3 likely causes and 2–4 safe checks or steps.
+CRITICAL: Only answer if the question is about a refrigerator or dishwasher. 
+If the question is about any other appliance (TV, microwave, oven, etc.), politely decline and say you can only help with refrigerators and dishwashers.
+
+If the context describes a repair for a refrigerator or dishwasher:
+- List 2–3 likely causes and 2–3 safe checks or steps from the context.
 - Emphasize unplugging / cutting power and when to call a technician.
-- Keep the answer tight and practical.
+- Keep the answer tight and practical (2-3 sentences maximum).
+- ONLY use information from the provided context. Do NOT make assumptions.
 
 If the context is more about usage, modes, or cycles:
-- Briefly explain what it means in plain language.
-- Give 1–2 practical tips for when and how to use it.
+- Briefly explain what the context says in plain language.
+- Give 1–2 practical tips from the context.
 
 Always mention that the advice comes from the PartSelect guides.
-At the end, in one short sentence, you may point them to the full repair resources:
-the main Repair section(https://www.partselect.com/Repair/) or Instant Repairman ("https://www.partselect.com/Instant-Repairman/.") on PartSelect.
+If the context doesn't have enough information, keep your answer short.
 """
 
-    return llm_answer(system_prompt, decision.normalized_query, context)
+
+    # Get LLM response
+    llm_response = llm_answer(system_prompt, decision.normalized_query, context)
+    
+    # Always append repair URLs
+    return (
+        f"{llm_response}\n\n"
+        f"For more detailed repair guides, visit: {REPAIR_URL}\n"
+        f"Or use our Instant Repairman tool: {INSTANT_REPAIRMAN_URL}"
+    )
 
 
 # ---------------------------------------------------------------------
@@ -237,36 +281,49 @@ def resolve_part_identifier(db: Session, part_id: str | None, mpn: str | None):
 
 def handle_compat_check(decision: RouteDecision, db: Session) -> str:
     part_id = decision.metadata.part_id
+    mpn = decision.metadata.manufacturer_part_number
     model_number = decision.metadata.model_number
 
     if not (part_id or mpn) or not model_number:
         return (
             "To check compatibility I need both:\n"
-            "- a PartSelect part ID (for example PS11752778), and\n"
+            "- a PartSelect part ID (for example PS11752778) or manufacturer part number, and\n"
             "- your appliance model number (for example WDT780SAEM1)."
         )
 
+    # Resolve the part using either part_id or MPN
+    part = resolve_part_identifier(db, part_id, mpn)
+    if not part:
+        identifier = part_id or mpn or "the part"
+        return (
+            f"I couldn't find {identifier} in my catalog. "
+            "Please double-check the part number or share the PartSelect product page URL."
+        )
+
+    # Check compatibility using the resolved part_id
     compat = (
         db.query(PartModelMapping)
         .filter(
-            PartModelMapping.part_id == part_id,
+            PartModelMapping.part_id == part.part_id,
             PartModelMapping.model_number == model_number,
         )
         .one_or_none()
     )
 
     if not compat:
+        identifier = part_id or mpn or part.part_id
         return (
-            f"I don't see {part_id} listed as compatible with model {model_number} "
-            "Please double-check on the PartSelect product page"
-            "or with the support before ordering."
+            f"I don't see {identifier} listed as compatible with model {model_number}. "
+            "Please double-check on the PartSelect product page "
+            "or with support before ordering."
         )
 
-    part = db.query(Part).filter(Part.part_id == part_id).one_or_none()
     model = db.query(Model).filter(Model.model_number == model_number).one_or_none()
+    identifier = part_id or mpn or part.part_id
 
     reply_lines = [
-        f"Based on my compatibility data, part {part_id} is compatible with model {model_number}.",
+        f"Based on my compatibility data, part {identifier} (PartSelect ID: {part.part_id}) "
+        f"is compatible with model {model_number}.",
     ]
     if part and part.product_url:
         reply_lines.append(f"You can review and buy it here: {part.product_url}")
@@ -277,66 +334,124 @@ def handle_compat_check(decision: RouteDecision, db: Session) -> str:
 
 
 # =====================================================================
-#  ORDER SUPPORT (STATIC / NO REAL ORDERS)
+#  ORDER SUPPORT (QUERY DATABASE)
 # =====================================================================
 
 def handle_order_support(decision: RouteDecision, db: Session) -> str:
-    system_prompt = """
-You are an order-support explainer for PartSelect.
-We do NOT have access to real accounts or orders here.
+    """
+    Simple order support handler for dummy data.
+    Handles: "Track order #1", "What did I order last?", "Was my return accepted?"
+    """
+    query_lower = decision.normalized_query.lower()
+    
+    # Extract order_id
+    order_id = None
+    if decision.metadata.order_id:
+        try:
+            order_id = int(decision.metadata.order_id)
+        except (ValueError, TypeError):
+            pass
+    
+    if not order_id:
+        import re
+        match = re.search(r'order\s*#?\s*(\d+)', query_lower)
+        if match:
+            try:
+                order_id = int(match.group(1))
+            except ValueError:
+                pass
+    
+    # Look up specific order
+    if order_id:
+        order = db.query(Order).filter(Order.order_id == order_id).first()
+        if order:
+            part = db.query(Part).filter(Part.part_id == order.part_id).first() if order.part_id else None
+            transaction = db.query(Transaction).filter(Transaction.order_id == order_id).first()
+            
+            lines = [f"Order #{order.order_id}: {order.order_status.title()}"]
+            if part:
+                lines.append(f"Part: {part.part_name}")
+            if transaction:
+                lines.append(f"Amount: ${transaction.amount}")
+            if order.shipping_type:
+                lines.append(f"Shipping: {order.shipping_type}")
+            return "\n".join(lines)
+        return f"Order #{order_id} not found."
+    
+    # "What did I order last?" - requires order ID
+    if any(p in query_lower for p in ["last order", "my order", "what did i order"]):
+        return (
+            "To check your orders, please provide your order number.\n"
+            "For example: 'Track order #1' or 'What is the status of order #2?'"
+        )
+    
+    # "Was my return accepted?" - requires order ID
+    if "return" in query_lower or "refund" in query_lower:
+        if order_id:
+            order = db.query(Order).filter(Order.order_id == order_id).first()
+            if order and order.order_status == "returned":
+                txn = db.query(Transaction).filter(Transaction.order_id == order_id).first()
+                if txn and txn.status == "refunded":
+                    return f"Yes, your return for order #{order_id} was accepted. Refund: ${txn.amount}"
+                return f"Return for order #{order_id} is being processed."
+            elif order:
+                return f"Order #{order_id} is not marked as returned."
+            else:
+                return f"Order #{order_id} not found."
+        
+        return (
+            "To check your return status, please provide your order number.\n"
+            "For example: 'Was my return accepted for order #3?'"
+        )
+    
+    # Fallback
+    return (
+        "I can help with order tracking. Please provide your order number.\n"
+        "For example: 'Track order #1' or 'What is the status of order #2?'"
+    )
 
-Using only this limitation:
-- Explain what customers normally see (order status, shipping, returns).
-- Give 2–3 short steps for how they would check this in a real PartSelect account.
-- Keep it high-level and under ~120 words.
-"""
-    return llm_answer(system_prompt, decision.normalized_query)
+
 
 
 # =====================================================================
-#  POLICY / WHY SHOP HERE (STATIC)
+#  POLICY / WHY SHOP HERE (STATIC URLS)
 # =====================================================================
 
 def handle_policy(decision: RouteDecision, db: Session) -> str:
-    context = """
-Why Shop at PartSelect (demo only, not official text):
-- OEM refrigerator & dishwasher parts
-- Fast shipping on many items
-- 365-day returns on most parts (example only)
-- Secure online checkout
-- Repair guides and videos
-- Live phone/chat support
-
-Return denial examples (demo only):
-- Installed electrical parts
-- Parts damaged by incorrect installation
-- Returns outside the allowed window
-"""
-
-    system_prompt = """
-You are explaining PartSelect-style policies at a high level.
-Use ONLY the provided bullets; do NOT invent exact legal guarantees.
-
-Give a short, friendly summary (2–3 sentences max).
-You may list 2–3 bullet points if it feels clearer.
-"""
-
-    return llm_answer(system_prompt, decision.normalized_query, context)
-
-
-# =====================================================================
-#  SMALL TALK (NO LLM)
-# =====================================================================
-
-def handle_small_talk(decision: RouteDecision, db: Session) -> str:
-    q = decision.normalized_query.lower()
-
-    if "thank" in q:
-        return "You're welcome! If you tell me your fridge or dishwasher issue, I can help you find parts or repair steps."
-    if "hi" in q or "hello" in q or "hey" in q:
-        return "Hi! I’m the PartSelect helper bot. I can help with parts, compatibility, and basic repair tips."
-
-    return "I’m here for refrigerator and dishwasher questions—what are you working on?"
+    """
+    Return static policy page URLs based on query keywords.
+    Only handles policy information, not order return status.
+    """
+    query_lower = decision.normalized_query.lower()
+    
+    # Map keywords to specific policy URLs
+    # Only match explicit policy questions
+    if "return policy" in query_lower or "return window" in query_lower:
+        url = "https://www.partselect.com/365-Day-Returns.htm"
+        policy_name = "365-Day Returns"
+    elif "warranty" in query_lower or "guarantee" in query_lower:
+        url = "https://www.partselect.com/One-Year-Warranty.htm"
+        policy_name = "One-Year Warranty"
+    elif "shipping" in query_lower or "fast shipping" in query_lower:
+        url = "https://www.partselect.com/Fast-Shipping.htm"
+        policy_name = "Fast Shipping"
+    elif "price match" in query_lower:
+        url = "https://www.partselect.com/Price-Match.htm"
+        policy_name = "Price Match"
+    else:
+        # Default: return all policy links
+        return (
+            "Here are our key policies:\n\n"
+            "• Fast Shipping: https://www.partselect.com/Fast-Shipping.htm\n"
+            "• 365-Day Returns: https://www.partselect.com/365-Day-Returns.htm\n"
+            "• One-Year Warranty: https://www.partselect.com/One-Year-Warranty.htm\n"
+            "• Price Match: https://www.partselect.com/Price-Match.htm"
+        )
+    
+    return (
+        f"For information about our {policy_name} policy, please visit:\n"
+        f"{url}"
+    )
 
 
 # =====================================================================
@@ -345,8 +460,10 @@ def handle_small_talk(decision: RouteDecision, db: Session) -> str:
 
 def handle_out_of_scope(decision: RouteDecision, db: Session) -> str:
     return (
-        "I’m designed specifically for refrigerator and dishwasher parts, "
-        "compatibility, and repair/usage guidance, so I can’t answer that one."
+        "I can help with refrigerator and dishwasher parts, "
+        "repair troubleshooting, and customer transactions "
+        "(order tracking, returns, etc.). I can't assist with questions outside of that scope.\n\n"
+        "For other inquiries, please visit PartSelect.com or contact our support team."
     )
 
 

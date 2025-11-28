@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, Iterable
 
 from app.config import settings
-from backend.app.rag.rag_store import get_collection, upsert_document
+from app.rag.rag_store import get_collection, upsert_document
 
 
 REPAIR_JSON = settings.data_dir / "repair_guides.json"

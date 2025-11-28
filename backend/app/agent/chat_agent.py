@@ -44,9 +44,6 @@ def handle_message(
     if intent == Intent.POLICY:
         return handlers.handle_policy(decision, db)
 
-    if intent == Intent.SMALL_TALK:
-        return handlers.handle_small_talk(decision, db)
-
     if intent == Intent.OUT_OF_SCOPE:
         return handlers.handle_out_of_scope(decision, db)
 
