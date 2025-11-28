@@ -12,12 +12,42 @@ interface Message {
 }
 
 const quickActions = [
-  { id: "repair", label: "Need repair help", response: "Sure — what appliance or part are you trying to repair?" },
-  { id: "order", label: "Help me with my order", response: "I'd be happy to help with your order! Could you provide your order number?" },
-  { id: "place", label: "Help me place an order", response: "Great! What part or appliance are you looking for?" },
-  { id: "compatibility", label: "Part compatibility check", response: "I can help check part compatibility. What's the model number of your appliance?" },
-  { id: "installation", label: "Installation instructions", response: "I can help with installation! What part do you need to install?" },
-  { id: "track", label: "Track my order", response: "I'll help you track your order. What's your order number?" },
+  {
+    id: 'repair',
+    label: 'Get repair help',
+    starterText: "Tell me what's wrong with your refrigerator or dishwasher and I'll help you diagnose the issue or find the right repair steps.",
+    examples: [
+      'The ice maker on my Whirlpool fridge is not working. How can I fix it?',
+      'My dishwasher is leaking from the bottom. What do I do?',
+    ],
+  },
+  {
+    id: 'compatible',
+    label: 'Find compatible parts',
+    starterText: 'Give me your model number (e.g., WDT780SAEM1) and I\'ll show you parts that are guaranteed to fit.',
+    examples: [
+      'Is PS11752778 compatible with Whirlpool WDT780SAEM1?',
+      'Does WPW10321304 fit my fridge?',
+    ],
+  },
+  {
+    id: 'order',
+    label: 'Help me with my order',
+    starterText: 'Share your order number and I can help you check status, shipping details, or returns.',
+    examples: [
+      'What is the status of order #2?',
+      'Help me track Order #1',
+    ],
+  },
+  {
+    id: 'usage',
+    label: 'How do I use this?',
+    starterText: 'Ask me about dishwasher or refrigerator cycles, settings, or usage tips, and I\'ll explain what they do based on PartSelect guides.',
+    examples: [
+      'What is eco mode on a dishwasher?',
+      'How do I reset my refrigerator?',
+    ],
+  },
 ];
 
 const ChatBot = () => {
@@ -26,7 +56,9 @@ const ChatBot = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [showQuickActions, setShowQuickActions] = useState(true);
+  const [currentExamples, setCurrentExamples] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -63,38 +95,52 @@ const ChatBot = () => {
   }, [isOpen]);
 
   const handleQuickAction = (action: typeof quickActions[0]) => {
-    // Add user message
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      type: "user",
-      content: action.label,
-    };
-    setMessages(prev => [...prev, userMessage]);
-    setShowQuickActions(false);
-
-    // Add assistant response after delay
-    setTimeout(() => {
+    if (action.starterText) {
+      // Add assistant message with starter text
       const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: Date.now().toString(),
         type: "assistant",
-        content: action.response,
+        content: action.starterText,
       };
       setMessages(prev => [...prev, assistantMessage]);
-    }, 600);
+      setShowQuickActions(false);
+      setCurrentExamples(action.examples || []);
+      
+      // Focus the input so user can type their response
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+    } else {
+      // Fallback to old behavior
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        type: "user",
+        content: action.label,
+      };
+      setMessages(prev => [...prev, userMessage]);
+      setShowQuickActions(false);
+    }
   };
 
-  const handleSend = () => {
-    if (!inputValue.trim()) return;
+  const handleExampleClick = (exampleText: string) => {
+    setInputValue(exampleText);
+    handleSend(exampleText);
+  };
+
+  const handleSend = (text?: string) => {
+    const messageText = text || inputValue.trim();
+    if (!messageText) return;
 
     // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
       type: "user",
-      content: inputValue,
+      content: messageText,
     };
     setMessages(prev => [...prev, userMessage]);
     setInputValue("");
     setShowQuickActions(false);
+    setCurrentExamples([]);
 
     // Add mock assistant response
     setTimeout(() => {
@@ -238,6 +284,30 @@ const ChatBot = () => {
                 </motion.div>
               )}
 
+              {/* Example Prompts */}
+              {currentExamples.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="pt-2 px-4"
+                >
+                  <div className="text-xs text-muted-foreground mb-2">Try these examples:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {currentExamples.map((example, idx) => (
+                      <motion.button
+                        key={idx}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handleExampleClick(example)}
+                        className="px-3 py-1.5 bg-secondary border border-border rounded-full text-xs font-medium text-foreground hover:bg-secondary/80 transition-colors"
+                      >
+                        {example}
+                      </motion.button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+
               <div ref={messagesEndRef} />
             </div>
 
@@ -245,14 +315,19 @@ const ChatBot = () => {
             <div className="p-4 bg-background border-t border-border">
               <div className="flex gap-2">
                 <Input
+                  ref={inputRef}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  onKeyPress={handleKeyPress}
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      handleSend();
+                    }
+                  }}
                   placeholder="Type your question…"
                   className="flex-1 rounded-full border-border focus-visible:ring-primary"
                 />
                 <Button
-                  onClick={handleSend}
+                  onClick={() => handleSend()}
                   size="icon"
                   className="rounded-full bg-primary hover:bg-primary/90 h-10 w-10"
                 >

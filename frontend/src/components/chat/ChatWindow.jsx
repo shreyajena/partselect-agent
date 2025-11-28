@@ -12,8 +12,7 @@ const QUICK_ACTIONS = [
     starterText: "Tell me what's wrong with your refrigerator or dishwasher and I'll help you diagnose the issue or find the right repair steps.",
     examples: [
       'The ice maker on my Whirlpool fridge is not working. How can I fix it?',
-      'My dishwasher is leaking from the bottom. What do I do?'
-      
+      'My dishwasher is leaking from the bottom. What do I do?',
     ],
   },
   {
@@ -37,12 +36,12 @@ const QUICK_ACTIONS = [
   {
     id: 'usage',
     label: 'How do I use this?',
-    starterText: 'Ask me about dishwasher or refrigerator cycles, settings, or usage tips, and I’ll explain what they do based on PartSelect guides.',
+    starterText: 'Ask me about dishwasher or refrigerator cycles, settings, or usage tips, and I\'ll explain what they do based on PartSelect guides.',
     examples: [
       'What is eco mode on a dishwasher?',
       'How do I reset my refrigerator?',
     ],
-  }
+  },
 ];
 
 const ChatWindow = ({ isExpanded, setIsExpanded, onClose }) => {

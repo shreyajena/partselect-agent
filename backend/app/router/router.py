@@ -1,100 +1,23 @@
 # app/router/router.py
 
 from __future__ import annotations
-import re
-from typing import Optional
 
 from .intents import Intent, RouteDecision, RoutingMetadata
-
-
-# ------------------------------------------------------------
-# Regex extractors
-# ------------------------------------------------------------
-
-PART_ID_REGEX = r"(PS\d{5,})"
-MODEL_REGEX = r"\b([A-Za-z0-9]{4,}[A-Za-z0-9-]*)\b"
-MPN_REGEX = r"\b([A-Z][A-Z0-9]{4,})\b"
-ORDER_ID_REGEX = r"order\s*#?\s*(\d+)"
-
-
-def extract_part_id(text: str) -> Optional[str]:
-    m = re.search(PART_ID_REGEX, text.upper())
-    return m.group(1) if m else None
-
-
-def extract_model_number(text: str) -> Optional[str]:
-    """
-    Grab things that look like appliance model numbers:
-    - at least 6 chars
-    - mix of letters+digits
-    - but NOT PS part IDs
-    """
-    text_up = text.upper()
-    candidates = re.findall(MODEL_REGEX, text_up)
-    for c in candidates:
-        if c.startswith("PS"):
-            continue
-        if len(c) >= 6 and any(ch.isdigit() for ch in c):
-            return c
-    return None
-
-
-def extract_mpn(text: str) -> Optional[str]:
-    """
-    Manufacturer part numbers like W10321304, 242126602, etc.
-    """
-    text_up = text.upper()
-    candidates = re.findall(MPN_REGEX, text_up)
-    for token in candidates:
-        if token.startswith("PS"):
-            continue
-        if any(ch.isdigit() for ch in token):
-            return token
-    return None
-
-
-def extract_order_id(text: str) -> Optional[str]:
-    """
-    Extract order ID from text. Handles:
-    - "order #83"
-    - "order 83"
-    - "track order 123"
-    - "order number 456"
-    - "order number is #4"
-    - "orderid #3"
-    """
-    text_lower = text.lower()
-    
-    # Try "order number is #X" or "order number #X"
-    m = re.search(r"order\s+number\s+(?:is\s+)?#?\s*(\d{1,6})", text_lower)
-    if m:
-        return m.group(1)
-    
-    # Try "orderid #X" or "order id #X"
-    m = re.search(r"order\s*id\s*#?\s*(\d{1,6})", text_lower)
-    if m:
-        return m.group(1)
-    
-    # Try the standard pattern "order #X"
-    m = re.search(ORDER_ID_REGEX, text_lower)
-    if m:
-        return m.group(1)
-    
-    # Try "order X" (standalone number after "order")
-    m = re.search(r"order\s+(\d{1,6})", text_lower)
-    if m:
-        return m.group(1)
-    
-    return None
-
-
-def extract_appliance_type(text: str) -> Optional[str]:
-    txt = text.lower()
-    if "dishwasher" in txt:
-        return "dishwasher"
-    if "fridge" in txt or "refrigerator" in txt:
-        return "refrigerator"
-    return None
+from .extractors import (
+    extract_part_id,
+    extract_model_number,
+    extract_mpn,
+    extract_order_id,
+    extract_appliance_type,
+)
+from .keywords import (
+    POLICY_KEYWORDS,
+    ORDER_KEYWORDS,
+    COMPAT_KEYWORDS,
+    GENERAL_REPAIR_WORDS,
+    REPAIR_KEYWORDS,
+    HOWTO_KEYWORDS,
+)
 
 
 # ------------------------------------------------------------
@@ -125,9 +48,8 @@ def route_intent(user_message: str) -> RouteDecision:
 
     # -----------------------------
     # 1. POLICY (check before order support to catch "return policy" etc.)
-    # Only match explicit policy questions, not order return status
     # -----------------------------
-    if any(k in msg for k in ["return policy", "return window", "policy", "why shop", "warranty", "guarantee", "shipping policy", "price match"]):
+    if any(k in msg for k in POLICY_KEYWORDS):
         return RouteDecision(
             intent=Intent.POLICY,
             normalized_query=user_message,
@@ -138,10 +60,7 @@ def route_intent(user_message: str) -> RouteDecision:
     # -----------------------------
     # 2. ORDER SUPPORT (when order_id present or order-related keywords)
     # -----------------------------
-    if order_id or any(
-        k in msg
-        for k in ["order", "ordr", "oder", "oroder", "tracking", "track shipment", "track", "shipment", "shipping", "my order", "order status", "refund my", "my return", "return status", "is my return", "return my order", "need to return"]
-    ):
+    if order_id or any(k in msg for k in ORDER_KEYWORDS):
         return RouteDecision(
             intent=Intent.ORDER_SUPPORT,
             normalized_query=user_message,
@@ -152,8 +71,7 @@ def route_intent(user_message: str) -> RouteDecision:
     # -----------------------------
     # 3. COMPATIBILITY CHECK
     # -----------------------------
-    compat_keywords = ["compatible", "fit", "work with"]
-    if any(k in msg for k in compat_keywords):
+    if any(k in msg for k in COMPAT_KEYWORDS):
         missing = []
         if not (part_id):
             missing.append("part_id")
@@ -192,16 +110,10 @@ def route_intent(user_message: str) -> RouteDecision:
     # -----------------------------
     
     # General repair detection: appliance type + repair words + no part ID
-    general_repair_words = [
-        "repair", "fix", "broken", "issue", "problem", "trouble", 
-        "not working", "malfunction", "error", "fault",
-        "check", "what should", "what to do", "help with"
-    ]
-    
     if (appliance_type and 
         not part_id and 
         not manufacturer_part_number and
-        any(k in msg for k in general_repair_words)):
+        any(k in msg for k in GENERAL_REPAIR_WORDS)):
         return RouteDecision(
             intent=Intent.REPAIR_HELP,
             normalized_query=user_message,
@@ -210,23 +122,7 @@ def route_intent(user_message: str) -> RouteDecision:
         )
     
     # Specific symptom keywords
-    repair_keywords = [
-        "leak", "leaking",
-        "noisy", "noise",
-        "won't start", "wont start", "not starting",
-        "not working", "stopped working",
-        "not dispensing", "not making ice",
-        "warm", "too warm", "not cooling", "not cold",
-        "freezing up", "icing up",
-        "smell", "odor",
-        "won't fill", "wont fill",
-        "won't drain", "wont drain",
-        "drain", "draining",
-        "stuck", "jammed",
-        "overflow", "flooding",
-    ]
-
-    if any(k in msg for k in repair_keywords):
+    if any(k in msg for k in REPAIR_KEYWORDS):
         return RouteDecision(
             intent=Intent.REPAIR_HELP,
             normalized_query=user_message,
@@ -237,15 +133,7 @@ def route_intent(user_message: str) -> RouteDecision:
     # -----------------------------
     # 5. BLOG HOW-TO / USAGE
     # -----------------------------
-    howto_keywords = [
-        "how to", "how do i",
-        "what is", "what does",
-        "explain",
-        "cycle", "mode", "eco", "sanitize", "quick wash", "settings",
-        "reset", "clean cycle",
-    ]
-
-    if any(k in msg for k in howto_keywords):
+    if any(k in msg for k in HOWTO_KEYWORDS):
         return RouteDecision(
             intent=Intent.BLOG_HOWTO,
             normalized_query=user_message,
