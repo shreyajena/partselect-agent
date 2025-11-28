@@ -262,7 +262,23 @@ Do NOT list the entire symptom list unless directly relevant.
 Only use what is in the provided SQL context.
 """
 
-    return llm_answer(system_prompt, decision.normalized_query, context)
+    metadata = {
+        "type": "product_info",
+        "product": {
+            "id": part.part_id,
+            "name": part.part_name,
+            "price": str(part.part_price) if part.part_price is not None else None,
+            "url": part.product_url,
+            "brand": part.brand,
+            "applianceType": part.appliance_type,
+            "installDifficulty": part.install_difficulty,
+            "installTime": part.install_time,
+            "symptoms": part.symptoms,
+        },
+    }
+
+    reply_text = llm_answer(system_prompt, decision.normalized_query, context)
+    return {"reply": reply_text, "metadata": metadata}
 
 
 # =====================================================================

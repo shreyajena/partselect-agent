@@ -251,6 +251,13 @@
   border: 1px solid rgba(0, 0, 0, 0.05);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
   letter-spacing: 0.005em;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.message-text {
+  margin: 0;
 }
 
 .message-bubble.assistant {
@@ -269,6 +276,87 @@
   color: var(--teal-green);
   font-weight: 600;
   text-decoration: underline;
+}
+
+.product-card {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #ffffff;
+  box-shadow: 0 6px 16px rgba(10, 106, 99, 0.08);
+}
+
+.product-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.product-card-title {
+  font-weight: 600;
+  color: #0a6a63;
+}
+
+.product-card-price {
+  font-weight: 700;
+  color: #d98b2b;
+}
+
+.product-card-body {
+  margin-top: 8px;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.product-card-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.product-card-row span {
+  color: #666;
+}
+
+.product-card-row.symptoms {
+  flex-direction: column;
+}
+
+.product-card-row.symptoms p {
+  margin: 0;
+  color: #333;
+}
+
+.product-card-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.product-card-btn {
+  flex: 1;
+  border: 1px solid #0a6a63;
+  color: #0a6a63;
+  background: #fff;
+  padding: 8px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.product-card-btn.primary {
+  background: #0a6a63;
+  color: #fff;
+}
+
+.product-card-btn:hover {
+  box-shadow: 0 4px 10px rgba(10, 106, 99, 0.15);
+  transform: translateY(-1px);
 }
 
 /* Quick Actions */

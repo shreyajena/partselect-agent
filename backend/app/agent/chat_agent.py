@@ -7,12 +7,17 @@ from app.router.router import route_intent
 from app.router.intents import Intent, RouteDecision
 from app.agent import handlers
 
+def _format_response(payload):
+    if isinstance(payload, dict) and "reply" in payload:
+        return payload
+    return {"reply": str(payload), "metadata": None}
+
 
 def handle_message(
     user_message: str,
     db: Session,
     conversation_snippet: str | None = None,  # kept for API compatibility
-) -> str:
+) -> dict:
     """
     Main entrypoint for the chat agent.
 
@@ -27,31 +32,31 @@ def handle_message(
     intent = decision.intent
 
     if intent == Intent.REPAIR_HELP:
-        return handlers.handle_repair_help(decision, db)
+        return _format_response(handlers.handle_repair_help(decision, db))
 
     if intent == Intent.BLOG_HOWTO:
-        return handlers.handle_blog_howto(decision, db)
+        return _format_response(handlers.handle_blog_howto(decision, db))
 
     if intent == Intent.PRODUCT_INFO:
-        return handlers.handle_product_info(decision, db)
+        return _format_response(handlers.handle_product_info(decision, db))
 
     if intent == Intent.COMPAT_CHECK:
-        return handlers.handle_compat_check(decision, db)
+        return _format_response(handlers.handle_compat_check(decision, db))
 
     if intent == Intent.ORDER_SUPPORT:
-        return handlers.handle_order_support(decision, db)
+        return _format_response(handlers.handle_order_support(decision, db))
 
     if intent == Intent.POLICY:
-        return handlers.handle_policy(decision, db)
+        return _format_response(handlers.handle_policy(decision, db))
 
     if intent == Intent.OUT_OF_SCOPE:
-        return handlers.handle_out_of_scope(decision, db)
+        return _format_response(handlers.handle_out_of_scope(decision, db))
 
     if intent == Intent.CLARIFICATION:
-        return handlers.handle_clarification(decision, db)
+        return _format_response(handlers.handle_clarification(decision, db))
 
     # Super defensive fallback
-    return (
+    return _format_response(
         "I’m not entirely sure how to handle that. "
         "I’m best at refrigerator and dishwasher parts, compatibility, and repair help. "
         "Could you rephrase your question with a bit more detail?"

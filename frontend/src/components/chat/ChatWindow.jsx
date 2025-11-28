@@ -35,8 +35,17 @@ const QUICK_ACTIONS = [
 
 const ChatWindow = ({ isExpanded, setIsExpanded, onClose }) => {
   const [messages, setMessages] = useState([
-    { id: 1, role: 'assistant', content: "Hi, I'm Selecto — your buddy for all things PartSelect!" },
-    { id: 2, role: 'assistant', content: 'Currently, I can help with dishwasher and refrigerator parts, repairs, and your order. You can start typing, or pick one of the quick options below.' },
+    {
+      id: 1,
+      role: 'assistant',
+      content: "Hi, I'm Selecto — your buddy for all things PartSelect!",
+    },
+    {
+      id: 2,
+      role: 'assistant',
+      content:
+        'Currently, I can help with dishwasher and refrigerator parts, repairs, and your order. You can start typing, or pick one of the quick options below.',
+    },
   ]);
   const [inputValue, setInputValue] = useState('');
   const [showQuickActions, setShowQuickActions] = useState(true);
@@ -52,11 +61,12 @@ const ChatWindow = ({ isExpanded, setIsExpanded, onClose }) => {
     scrollToBottom();
   }, [messages, isTyping]);
 
-  const addMessage = (role, content) => {
+  const addMessage = (role, content, metadata = null) => {
     const newMessage = {
       id: Date.now() + Math.random(),
       role,
       content,
+      metadata,
     };
     setMessages(prev => [...prev, newMessage]);
   };
@@ -74,8 +84,8 @@ const ChatWindow = ({ isExpanded, setIsExpanded, onClose }) => {
     setIsTyping(true);
 
     try {
-      const { reply } = await sendChatMessage(messageText);
-      addMessage('assistant', reply);
+      const { reply, metadata } = await sendChatMessage(messageText);
+      addMessage('assistant', reply, metadata || null);
     } catch (error) {
       addMessage(
         'assistant',
@@ -140,7 +150,7 @@ const ChatWindow = ({ isExpanded, setIsExpanded, onClose }) => {
       {/* Messages Area */}
       <div className="chat-messages">
         {messages.map(message => (
-          <MessageBubble key={message.id} message={message} />
+          <MessageBubble key={message.id} message={message} onPrompt={sendMessage} />
         ))}
 
         {showQuickActions && messages.length <= 2 && (

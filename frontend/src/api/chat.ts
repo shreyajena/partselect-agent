@@ -3,6 +3,7 @@ const API_BASE_URL =
 
 export interface ChatReply {
   reply: string;
+  metadata?: Record<string, unknown> | null;
 }
 
 export async function sendChatMessage(message: string): Promise<ChatReply> {

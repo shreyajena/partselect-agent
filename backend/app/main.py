@@ -33,6 +33,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+    metadata: dict | None = None
 
 
 # --------------------------------------------------------------
@@ -109,13 +110,13 @@ def chat_endpoint(payload: ChatRequest, db: Session = Depends(get_db)):
     if not payload.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty.")
 
-    reply = handle_message(
+    response_payload = handle_message(
         payload.message,
         db,
         conversation_snippet=payload.conversation_snippet
     )
 
-    return ChatResponse(reply=reply)
+    return ChatResponse.model_validate(response_payload)
 
 
 @app.get("/health")
