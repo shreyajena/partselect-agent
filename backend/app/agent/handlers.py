@@ -10,6 +10,15 @@ from app.rag.retrieval import retrieve_documents
 from app.llm.client import get_chat_client, get_default_model
 from app.router.intents import RouteDecision
 
+
+def _escape_like(term: str) -> str:
+    """Escape LIKE wildcards to reduce injection risk."""
+    return (
+        term.replace("\\", "\\\\")
+        .replace("%", r"\%")
+        .replace("_", r"\_")
+    )
+
 logger = logging.getLogger(__name__)
 
 # =====================================================================
@@ -22,6 +31,7 @@ Be friendly, concise, and practical.
 Base every answer ONLY on the structured data or context provided.
 Keep answers short (about 2–4 sentences, max ~120 words).
 If you are unsure, say so and point the user to the relevant PartSelect page.
+End every answer with the sentence: "Source: PartSelect data."
 """
 
 
@@ -170,9 +180,10 @@ def handle_product_info(decision: RouteDecision, db: Session) -> str:
     # 2) Manufacturer part number.
     if not part and getattr(decision.metadata, "manufacturer_part_number", None):
         mpn = decision.metadata.manufacturer_part_number
+        escaped_mpn = _escape_like(mpn)
         part = (
             db.query(Part)
-            .filter(Part.manufacturer_part_number.ilike(f"%{mpn}%"))
+            .filter(Part.manufacturer_part_number.ilike(f"%{escaped_mpn}%", escape="\\"))
             .first()
         )
 
@@ -189,9 +200,10 @@ def handle_product_info(decision: RouteDecision, db: Session) -> str:
 
     # 4) Very soft fallback: name fuzzy search.
     if not part:
+        fuzzy_query = _escape_like(decision.normalized_query)
         part = (
             db.query(Part)
-            .filter(Part.part_name.ilike(f"%{decision.normalized_query}%"))
+            .filter(Part.part_name.ilike(f"%{fuzzy_query}%", escape="\\"))
             .first()
         )
 
