@@ -178,6 +178,26 @@ def route_intent(user_message: str) -> RouteDecision:
     # -----------------------------
     # 4. REPAIR HELP (symptoms)
     # -----------------------------
+    
+    # General repair detection: appliance type + repair words + no part ID
+    general_repair_words = [
+        "repair", "fix", "broken", "issue", "problem", "trouble", 
+        "not working", "malfunction", "error", "fault",
+        "check", "what should", "what to do", "help with"
+    ]
+    
+    if (appliance_type and 
+        not part_id and 
+        not manufacturer_part_number and
+        any(k in msg for k in general_repair_words)):
+        return RouteDecision(
+            intent=Intent.REPAIR_HELP,
+            normalized_query=user_message,
+            metadata=metadata,
+            debug_reason="repair_appliance_type_general",
+        )
+    
+    # Specific symptom keywords
     repair_keywords = [
         "leak", "leaking",
         "noisy", "noise",
@@ -189,6 +209,7 @@ def route_intent(user_message: str) -> RouteDecision:
         "smell", "odor",
         "won't fill", "wont fill",
         "won't drain", "wont drain",
+        "drain", "draining",
         "stuck", "jammed",
         "overflow", "flooding",
     ]

@@ -381,6 +381,7 @@
   font-weight: 600;
   text-decoration: underline;
   transition: color 0.2s ease;
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .message-bubble.user a {
@@ -890,6 +891,58 @@
 .quick-action-chip:active {
   transform: translateY(0);
   box-shadow: 0 2px 6px rgba(10, 106, 99, 0.2);
+}
+
+/* Example Prompts */
+.example-prompts {
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  border: 1px solid rgba(10, 106, 99, 0.1);
+  animation: fadeInUp 0.3s ease-out;
+}
+
+.example-prompts-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.example-prompts-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.example-prompt-chip {
+  background-color: var(--white);
+  border: 1.5px solid rgba(10, 106, 99, 0.2);
+  color: var(--teal-green);
+  padding: 8px 14px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: normal;
+  text-align: left;
+  line-height: 1.4;
+  max-width: 100%;
+}
+
+.example-prompt-chip:hover {
+  background-color: rgba(10, 106, 99, 0.05);
+  border-color: var(--teal-green);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(10, 106, 99, 0.15);
+}
+
+.example-prompt-chip:active {
+  transform: translateY(0);
 }
 
 /* Typing Indicator */

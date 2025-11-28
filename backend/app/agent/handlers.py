@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import re
 import time
 from typing import Optional
 
@@ -37,12 +38,53 @@ logger = logging.getLogger(__name__)
 # =====================================================================
 
 GLOBAL_STYLE = """
-You are the PartSelect helper bot for refrigerator and dishwasher questions.
-Be friendly, concise, and practical.
-Base every answer ONLY on the structured data or context provided.
-Keep answers short (about 2–4 sentences, max ~120 words).
-If you are unsure, say so and point the user to the relevant PartSelect page.
+You are the PartSelect helper bot for refrigerator and dishwasher questions. 
+Stay friendly, concise, and practical. Your job is to give quick, helpful answers based ONLY on the structured part data or RAG context provided.
+
+RULES:
+- Keep answers short: about 2–4 sentences (~120 words max).
+- Never guess or add information that is not in the context.
+- Use plain text only. No bullets, no markdown, no numbered lists.
+- Use short paragraphs separated by simple line breaks.
+- If unsure, say so and suggest checking the appropriate PartSelect page.
+- Stay strictly within refrigerator and dishwasher topics.
+- Keep tone conversational: helpful, calm, and clear.
 """
+
+
+# =====================================================================
+#  TEXT CLEANUP HELPER
+# =====================================================================
+
+def clean_llm_response(text: str) -> str:
+    """
+    Clean up markdown formatting that might slip through from LLM responses.
+    Removes markdown bold/italic, headers, and normalizes spacing.
+    """
+    if not text:
+        return text
+    
+    # Remove markdown bold (**text** or __text__)
+    text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+    text = re.sub(r'__([^_]+)__', r'\1', text)
+    
+    # Remove markdown italic (*text* or _text_)
+    text = re.sub(r'\*([^*]+)\*', r'\1', text)
+    text = re.sub(r'_([^_]+)_', r'\1', text)
+    
+    # Remove markdown headers (# Header)
+    text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
+    
+    # Remove markdown list markers (1. or - or *)
+    text = re.sub(r'^\s*[\d\.\-\*]+\s+', '', text, flags=re.MULTILINE)
+    
+    # Clean up multiple consecutive newlines (max 2)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    
+    # Trim whitespace
+    text = text.strip()
+    
+    return text
 
 
 # =====================================================================
@@ -80,7 +122,8 @@ def llm_answer(system_prompt: str, user_prompt: str, context: str = "", max_retr
             response = completion.choices[0].message.content
             if not response or not response.strip():
                 raise ValueError("Empty response from LLM")
-            return response
+            # Clean up any markdown formatting
+            return clean_llm_response(response)
         except Exception as e:
             last_error = e
             if attempt < max_retries - 1:
@@ -117,11 +160,13 @@ def _rag_answer(decision: RouteDecision, preferred_source: str) -> dict:
     # Define repair URLs
     REPAIR_URL = "https://www.partselect.com/Repair/"
     INSTANT_REPAIRMAN_URL = "https://www.partselect.com/Instant-Repairman/"
+    REMOTE_SERVICER_URL = "https://www.partselect.com/remote-servicer/"
 
     link_meta = _link_metadata(
         [
             {"label": "Repair Guides", "url": REPAIR_URL},
             {"label": "Instant Repairman", "url": INSTANT_REPAIRMAN_URL},
+            {"label": "Find a Technician", "url": REMOTE_SERVICER_URL},
         ]
     )
 
@@ -143,7 +188,8 @@ If the question is about any other appliance (TV, microwave, oven, etc.), polite
 
 If the context describes a repair for a refrigerator or dishwasher:
 - List 2–3 likely causes and 2–3 safe checks or steps from the context.
-- Emphasize unplugging / cutting power and when to call a technician.
+- Emphasize unplugging / cutting power and when to call a qualified technician.
+- When recommending a technician, mention that PartSelect offers a remote servicer directory to help find qualified technicians.
 - Keep the answer tight and practical (2-3 sentences maximum).
 - ONLY use information from the provided context. Do NOT make assumptions.
 
@@ -287,8 +333,7 @@ Only use what is in the provided SQL context.
             "brand": part.brand,
             "applianceType": part.appliance_type,
             "installDifficulty": part.install_difficulty,
-            "installTime": part.install_time,
-            "symptoms": part.symptoms,
+            "installTime": part.install_time
         },
     }
 

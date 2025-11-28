@@ -9,27 +9,37 @@ const QUICK_ACTIONS = [
   {
     id: 'repair',
     label: 'Need repair help',
-    prompt: 'My dishwasher is leaking. What should I check first?',
+    starterText: 'Tell me what\'s wrong with your refrigerator or dishwasher and I\'ll help you diagnose the issue or find the right repair steps.',
+    examples: [
+      'My Whirlpool fridge ice maker stopped working. What part do I need?',
+      'My dishwasher is leaking water. What do I do?'
+    ],
   },
   {
     id: 'order',
     label: 'Help me with my order',
-    prompt: 'Track my order #1',
+    starterText: 'Share your order number and I can help you check status, shipping details, or returns.',
+    examples: [
+      'What is the status of order #2?',
+      'Help me track Order #1",
+    ],
   },
   {
     id: 'compatible',
     label: 'Find compatible parts',
-    prompt: 'Is part PS11752778 compatible with WDT780SAEM1?',
+    starterText: 'Give me your model number (e.g., WDT780SAEM1) and I\'ll show you parts that are guaranteed to fit.',
+    examples: [
+      'Is part PS11752778 compatible with my model?',
+      'What parts can be replaced for part PS11752778?',
+    ],
   },
   {
     id: 'place',
     label: 'Help me place an order',
-    prompt: 'I want to order a replacement ice maker for my Whirlpool fridge.',
-  },
-  {
-    id: 'track',
-    label: 'Track my order',
-    prompt: 'Where is my order #2?',
+    starterText: 'Tell me which part you\'re looking for or describe the issue. I\'ll recommend the part and guide you through checkout.',
+    examples: [
+      'I need a replacement door gasket for Whirlpool WRF560SEHZ00.'
+    ],
   },
 ];
 
@@ -44,12 +54,13 @@ const ChatWindow = ({ isExpanded, setIsExpanded, onClose }) => {
       id: 2,
       role: 'assistant',
       content:
-        'Currently, I can help with dishwasher and refrigerator parts, repairs, and your order. You can start typing, or pick one of the quick options below.',
+        'I can help you find the right refrigerator or dishwasher parts, troubleshoot issues, check compatibility, and guide you with your order. Just start typing, or pick one of the quick actions below.',
     },
   ]);
   const [inputValue, setInputValue] = useState('');
   const [showQuickActions, setShowQuickActions] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
+  const [currentExamples, setCurrentExamples] = useState([]);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -72,7 +83,25 @@ const ChatWindow = ({ isExpanded, setIsExpanded, onClose }) => {
   };
 
   const handleQuickAction = (action) => {
-    sendMessage(action.prompt || action.label, action.label);
+    if (action.starterText) {
+      // Add assistant message with starter text
+      addMessage('assistant', action.starterText);
+      setShowQuickActions(false);
+      // Store examples to show them
+      setCurrentExamples(action.examples || []);
+      
+      // Focus the input so user can type their response
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+    } else {
+      // Fallback to old behavior if prompt exists
+      sendMessage(action.prompt || action.label, action.label);
+    }
+  };
+
+  const handleExampleClick = (exampleText) => {
+    sendMessage(exampleText, exampleText);
   };
 
   const sendMessage = async (text, displayText) => {
@@ -81,6 +110,7 @@ const ChatWindow = ({ isExpanded, setIsExpanded, onClose }) => {
 
     addMessage('user', displayText || text);
     setShowQuickActions(false);
+    setCurrentExamples([]); // Clear examples when user sends a message
     setIsTyping(true);
 
     try {
@@ -171,6 +201,23 @@ const ChatWindow = ({ isExpanded, setIsExpanded, onClose }) => {
 
         {showQuickActions && messages.length <= 2 && (
           <QuickActions actions={QUICK_ACTIONS} onActionClick={handleQuickAction} />
+        )}
+
+        {currentExamples.length > 0 && (
+          <div className="example-prompts">
+            <div className="example-prompts-label">Try these examples:</div>
+            <div className="example-prompts-chips">
+              {currentExamples.map((example, idx) => (
+                <button
+                  key={idx}
+                  className="example-prompt-chip"
+                  onClick={() => handleExampleClick(example)}
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         {isTyping && (

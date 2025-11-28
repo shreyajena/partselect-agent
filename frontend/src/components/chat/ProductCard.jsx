@@ -15,7 +15,6 @@ const ProductCard = ({ product, onPrompt }) => {
     name,
     price,
     url,
-    symptoms,
     installDifficulty,
     installTime,
     applianceType,
@@ -27,13 +26,6 @@ const ProductCard = ({ product, onPrompt }) => {
     const prompt = `Is part ${id} compatible with my appliance model?`;
     onPrompt(prompt, `Check compatibility for ${id}`);
   };
-
-  // Parse symptoms if it's a string
-  const symptomList = symptoms 
-    ? (typeof symptoms === 'string' 
-        ? symptoms.split(',').map(s => s.trim()).filter(Boolean)
-        : Array.isArray(symptoms) ? symptoms : [])
-    : [];
 
   return (
     <div className="product-card">
