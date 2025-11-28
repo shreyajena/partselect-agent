@@ -17,6 +17,7 @@ PRICE_MATCH_URL = "https://www.partselect.com/Price-Match.htm"
 # General URLs
 BROWSE_PARTS_URL = "https://www.partselect.com/"
 CONTACT_SUPPORT_URL = "https://www.partselect.com/Contact/#OrderPh"
-CUSTOMER_SUPPORT_URL = "https://www.partselect.com/Customer-Support/"
+CUSTOMER_SUPPORT_URL = "https://www.partselect.com/Contact/#OrderPh"
 SELF_SERVICE_RETURN_URL = "https://www.partselect.com/user/self-service/"
+BLOG_RESOURCES_URL = "https://www.partselect.com/blog/"
 

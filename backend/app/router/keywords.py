@@ -73,6 +73,8 @@ REPAIR_KEYWORDS = [
     "not working",
     "stopped working",
     "not dispensing",
+    "won't dispense",
+    "dispense",
     "not making ice",
     "warm",
     "too warm",

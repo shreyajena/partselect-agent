@@ -22,6 +22,7 @@ from app.config.urls import (
     SHIPPING_URL,
     PRICE_MATCH_URL,
     SELF_SERVICE_RETURN_URL,
+    BLOG_RESOURCES_URL,
 )
 from app.config.constants import (
     LLM_MAX_RETRIES,
@@ -126,13 +127,27 @@ def _rag_answer(decision: RouteDecision, preferred_source: str) -> dict:
     )
     logger.info("RAG retrieved %d docs for source=%s", len(docs), preferred_source)
 
-    link_meta = link_metadata(
-        [
-            {"label": "Repair Guides", "url": REPAIR_URL},
-            {"label": "Instant Repairman", "url": INSTANT_REPAIRMAN_URL},
-            {"label": "Find a Technician", "url": REMOTE_SERVICER_URL},
-        ]
-    )
+    # Determine links based on preferred_source (intent), not the actual top result
+    # This ensures repair queries show repair links, blog queries show blog links
+    if preferred_source == "blogs":
+        # Blog/how-to queries - show blog-related links
+        link_meta = link_metadata(
+            [
+                {"label": "PartSelect Blog", "url": BLOG_RESOURCES_URL},
+                {"label": "Repair Guides", "url": REPAIR_URL},
+            ]
+        )
+        footer_text = "For more usage tips and guides, visit the PartSelect Blog or browse our Repair Guides."
+    else:
+        # Repair queries - show repair links
+        link_meta = link_metadata(
+            [
+                {"label": "Repair Guides", "url": REPAIR_URL},
+                {"label": "Instant Repairman", "url": INSTANT_REPAIRMAN_URL},
+                {"label": "Find a Technician", "url": REMOTE_SERVICER_URL},
+            ]
+        )
+        footer_text = MESSAGE_RAG_FOOTER
 
     if not docs:
         return {"reply": ERROR_RAG_NO_DOCS, "metadata": link_meta}
@@ -141,7 +156,8 @@ def _rag_answer(decision: RouteDecision, preferred_source: str) -> dict:
 
     # Get LLM response
     llm_response = llm_answer(REPAIR_HELP_PROMPT, decision.normalized_query, context)
-    reply = f"{llm_response}\n\n{MESSAGE_RAG_FOOTER}"
+    
+    reply = f"{llm_response}\n\n{footer_text}"
 
     return {"reply": reply, "metadata": link_meta}
 
