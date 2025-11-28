@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send, Maximize2, Minimize2 } from "lucide-react";
+import psLogo from "@/assets/ps-logo.svg";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -154,10 +155,12 @@ const ChatBot = () => {
             {/* Header */}
             <div className="bg-primary text-primary-foreground p-4 flex items-center gap-3">
               <div className="flex items-center gap-3 flex-1">
-                <div className="h-10 w-10 rounded-full bg-primary-foreground/20 flex items-center justify-center font-bold text-lg">
-                  PS
-                </div>
-                <div className="h-8 w-8 rounded-full bg-partselect-red flex items-center justify-center">
+                <img
+                  src={psLogo}
+                  alt="PartSelect logo"
+                  className="h-10 w-auto rounded-md bg-white/95 p-1 shadow-sm"
+                />
+                <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center">
                   <span className="text-lg">🤖</span>
                 </div>
                 <div className="flex-1">

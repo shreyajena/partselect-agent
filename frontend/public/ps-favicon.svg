@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <style>
+      .house-base { fill: #ee9721; }
+      .house-door { fill: #fff; }
+      .house-roof { fill: #337778; }
+    </style>
+  </defs>
+  <rect class="house-roof" x="8" y="28" width="48" height="18" rx="2"/>
+  <path class="house-base" d="M32 4 4 20h8v24h40V20h8L32 4z"/>
+  <rect class="house-door" x="26" y="26" width="12" height="16" rx="2"/>
+</svg>
+

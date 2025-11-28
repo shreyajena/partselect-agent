@@ -3,6 +3,7 @@ import MessageBubble from './MessageBubble';
 import QuickActions from './QuickActions';
 import './ChatWidget.css';
 import { sendChatMessage } from '../../api/chat';
+import psLogo from '../../assets/ps-logo.svg';
 
 const QUICK_ACTIONS = [
   {
@@ -35,7 +36,7 @@ const QUICK_ACTIONS = [
 const ChatWindow = ({ isExpanded, setIsExpanded, onClose }) => {
   const [messages, setMessages] = useState([
     { id: 1, role: 'assistant', content: "Hi, I'm Selecto — your buddy for all things PartSelect!" },
-    { id: 2, role: 'assistant', content: 'You can start typing, or pick one of the quick options below.' },
+    { id: 2, role: 'assistant', content: 'Currently, I can help with dishwasher and refrigerator parts, repairs, and your order. You can start typing, or pick one of the quick options below.' },
   ]);
   const [inputValue, setInputValue] = useState('');
   const [showQuickActions, setShowQuickActions] = useState(true);
@@ -106,14 +107,16 @@ const ChatWindow = ({ isExpanded, setIsExpanded, onClose }) => {
       {/* Header */}
       <div className="chat-header">
         <div className="chat-header-left">
-          <div className="partselect-logo">
-            <div className="house-icon">🏠</div>
-            <span className="logo-text">PS</span>
-          </div>
+          <img
+            src={psLogo}
+            alt="PartSelect logo"
+            className="partselect-logo-img"
+            draggable={false}
+          />
           <div className="selecto-avatar">🤖</div>
           <div className="chat-header-text">
             <div className="chat-title">Selecto — Your Parts Buddy</div>
-            <div className="chat-subtitle">Ask me anything about parts, repairs, or your order.</div>
+            <div className="chat-subtitle">Ask me anything about dishwasher/refrigerator parts, repairs, or your order.</div>
           </div>
         </div>
         <div className="chat-header-right">

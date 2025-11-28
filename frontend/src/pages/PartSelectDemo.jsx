@@ -1,5 +1,7 @@
 import ChatWidget from '../components/chat/ChatWidget';
 import './PartSelectDemo.css';
+import psLogo from '../assets/ps-logo.svg';
+import heroImage from '../assets/ps-section.png';
 const PartSelectDemo = () => {
   const brands = ['Whirlpool', 'Samsung', 'LG', 'GE', 'Frigidaire', 'Maytag', 'KitchenAid', 'Bosch'];
   return <div className="partselect-demo">
@@ -8,8 +10,12 @@ const PartSelectDemo = () => {
         <div className="demo-header-top">
           <div className="demo-container">
             <div className="demo-logo">
-              <div className="demo-house-icon">🏠</div>
-              <span className="demo-logo-text">PartSelect</span>
+              <img
+                src={psLogo}
+                alt="PartSelect logo"
+                className="partselect-logo-img"
+                draggable={false}
+              />
             </div>
             <nav className="demo-nav">
               <a href="#brand">Find by Brand</a>
@@ -22,11 +28,15 @@ const PartSelectDemo = () => {
             </nav>
           </div>
         </div>
-        <div className="demo-support-ribbon">
-          <div className="demo-container">
-            <span>🎯 Free Expert Support • 7 Days a Week • 365 Days a Year</span>
-          </div>
-        </div>
+        {/* Hero Screenshot */}
+      <section className="demo-hero">
+        <img
+          src={heroImage}
+          alt="PartSelect search hero"
+          className="demo-hero-image"
+          draggable={false}
+        />
+      </section>
       </header>
 
       {/* Main Content */}

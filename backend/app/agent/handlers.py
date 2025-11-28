@@ -31,7 +31,6 @@ Be friendly, concise, and practical.
 Base every answer ONLY on the structured data or context provided.
 Keep answers short (about 2–4 sentences, max ~120 words).
 If you are unsure, say so and point the user to the relevant PartSelect page.
-End every answer with the sentence: "Source: PartSelect data."
 """
 
 
