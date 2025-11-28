@@ -16,23 +16,14 @@ PartSelect Chat Agent is an intelligent conversational system designed to assist
 
 🤖 **Context-Aware Conversations**: Intelligent intent routing ensures accurate responses tailored to your specific query type
 
-## 🏗️ Architecture
 
-### System Design
+## 🏗️ System Architecture
 
-```
-┌─────────────────┐         ┌──────────────────┐         ┌─────────────────┐
-│   React Frontend │ ◄─────► │   FastAPI Backend │ ◄─────► │   DeepSeek LLM   │
-│   (TypeScript)   │   HTTP  │   (Python)        │   API   │   (Required)     │
-└─────────────────┘         └──────────────────┘         └─────────────────┘
-                                      │
-                                      ├──► SQLite (Structured Data)
-                                      │      - Parts, Models, Orders
-                                      │
-                                      └──► ChromaDB (Vector Store)
-                                             - Repair Guides
-                                             - Blog Articles
-```
+The following diagram illustrates the complete request flow from user query to response, including intent routing, data retrieval, and response generation:
+
+![System Architecture Flowchart](docs/system-architecture.jpg)
+
+*Note: If the image doesn't display, you can find it in the `docs/` directory or view it in the repository.*
 
 ### Key Components
 
