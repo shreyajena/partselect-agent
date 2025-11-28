@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     data_dir: Path = Field(default_factory=_default_data_dir)
     chroma_dir: Path = Field(default_factory=_default_chroma_dir)
     chroma_collection: str = "documents"
+    deepseek_api_key: str | None = Field(default=None, description="API key for DeepSeek")
+    openai_api_key: str | None = Field(default=None, description="API key for OpenAI (fallback)")
+    llm_provider: str = Field(default="deepseek", description="Which LLM client to use: 'deepseek' or 'openai'")
+    deepseek_model: str = "deepseek-chat"
+    openai_model: str = "gpt-4o-mini"
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="INSTALILY_")
 

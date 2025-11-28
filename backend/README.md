@@ -28,6 +28,11 @@ pip install -r requirements.txt
 ```
 
 Export optional overrides (SQLite path, data dir, etc.) through `.env` variables prefixed with `INSTALILY_` (see `app/config.py` for defaults).
+LLM settings:
+- `INSTALILY_LLM_PROVIDER` = `deepseek` (default) or `openai`
+- `INSTALILY_DEEPSEEK_API_KEY` when using DeepSeek
+- `INSTALILY_OPENAI_API_KEY` when using OpenAI
+- Optional: `INSTALILY_DEEPSEEK_MODEL` / `INSTALILY_OPENAI_MODEL` to override default model names.
 
 ## Ingestion Workflow
 
@@ -49,3 +54,21 @@ Export optional overrides (SQLite path, data dir, etc.) through `.env` variables
    - Indexes repair guide sections and blog sections into the `documents` collection.
 
 These steps complete the data foundation and prepare the repo for the next phase (FastAPI endpoints + DeepSeek agent wiring).
+
+## FastAPI Agent
+
+Run the chat API locally:
+
+```bash
+cd backend
+source .venv/bin/activate
+uvicorn app.main:app --reload
+```
+
+Sample request:
+
+```bash
+curl -X POST http://127.0.0.1:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "How do I install PS11752778?"}'
+```
