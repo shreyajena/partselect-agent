@@ -88,7 +88,7 @@ If the context is more about usage, modes, or cycles:
 - Briefly explain what it means in plain language.
 - Give 1–2 practical tips for when and how to use it.
 
-Always mention that the advice comes from the provided PartSelect guides.
+Always mention that the advice comes from the PartSelect guides.
 At the end, in one short sentence, you may point them to the full repair resources:
 the main Repair section(https://www.partselect.com/Repair/) or Instant Repairman ("https://www.partselect.com/Instant-Repairman/.") on PartSelect.
 """
@@ -174,15 +174,37 @@ def handle_product_info(decision: RouteDecision, db: Session) -> str:
     )
 
     system_prompt = """
-You are a PartSelect parts expert.
+You are a PartSelect parts expert.  
+Base your answer ONLY on the structured part context provided below.  
+Never use outside knowledge, never invent symptoms, steps, or claims.
 
-Using ONLY the part context:
-- Briefly explain what this part does and where it sits on the appliance.
-- Mention 1–2 common symptoms for when it’s usually replaced.
-- Give a very high-level, generic idea of installation (no model-specific steps).
-- Always include the product URL as the place to confirm fit and see full details.
+Follow these rules depending on the user’s question:
+
+1) If the user asks “what is this part / what does it do?”:
+   - Explain the part’s function using the description field.
+   - Mention one or two symptoms from the symptoms list if relevant.
+
+2) If the user asks about installation (“how to install / replace it”):
+   - Give a very SHORT 1–2 sentence installation summary based on the 
+     install_difficulty + install_time + description fields.
+   - Do NOT guess model-specific steps.
+   - If the part is “easy / tool-free”, mention that.
+
+3) If the user describes a problem (“leaking / won’t dispense ice / door won’t close”):
+   - Check if that symptom appears in the part’s symptom list.
+   - If yes: confirm that this part commonly fixes that issue.
+   - If no: politely say the context does not list that symptom.
+
+4) ALWAYS:
+   - Keep the entire answer within 2–4 sentences.
+   - Be friendly and conversational.
+   - End with: “You can confirm fit and see full details here: <URL>”.
 
 Keep it to 2–4 sentences total.
+
+Do not mention any fields that are empty or missing.
+Do NOT list the entire symptom list unless directly relevant.
+Only use what is in the provided SQL context.
 """
 
     return llm_answer(system_prompt, decision.normalized_query, context)
@@ -191,12 +213,33 @@ Keep it to 2–4 sentences total.
 # =====================================================================
 #  COMPATIBILITY CHECK (SQL ONLY, NO LLM)
 # =====================================================================
+def resolve_part_identifier(db: Session, part_id: str | None, mpn: str | None):
+    """
+    Return a Part object if either part_id or MPN matches.
+    Prefer explicit PartSelect ID if available.
+    """
+    if part_id:
+        part = db.query(Part).filter(Part.part_id == part_id).one_or_none()
+        if part:
+            return part
+    
+    if mpn:
+        part = (
+            db.query(Part)
+            .filter(Part.manufacturer_part_number.ilike(f"%{mpn}%"))
+            .first()
+        )
+        if part:
+            return part
+
+    return None
+
 
 def handle_compat_check(decision: RouteDecision, db: Session) -> str:
     part_id = decision.metadata.part_id
     model_number = decision.metadata.model_number
 
-    if not part_id or not model_number:
+    if not (part_id or mpn) or not model_number:
         return (
             "To check compatibility I need both:\n"
             "- a PartSelect part ID (for example PS11752778), and\n"
@@ -215,18 +258,16 @@ def handle_compat_check(decision: RouteDecision, db: Session) -> str:
     if not compat:
         return (
             f"I don't see {part_id} listed as compatible with model {model_number} "
-            "in my local table. Please double-check on the PartSelect product page "
-            "or with their support before ordering."
+            "Please double-check on the PartSelect product page"
+            "or with the support before ordering."
         )
 
     part = db.query(Part).filter(Part.part_id == part_id).one_or_none()
     model = db.query(Model).filter(Model.model_number == model_number).one_or_none()
 
     reply_lines = [
-        f"✅ Based on my local compatibility data, part {part_id} is compatible with model {model_number}.",
+        f"Based on my compatibility data, part {part_id} is compatible with model {model_number}.",
     ]
-    if compat.notes:
-        reply_lines.append(f"Notes: {compat.notes}")
     if part and part.product_url:
         reply_lines.append(f"You can review and buy it here: {part.product_url}")
     if model and model.brand:

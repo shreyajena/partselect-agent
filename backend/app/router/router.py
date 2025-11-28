@@ -1,3 +1,5 @@
+# app/router/router.py
+
 from __future__ import annotations
 import re
 from typing import Optional
@@ -8,6 +10,7 @@ from .intents import Intent, RouteDecision, RoutingMetadata
 # ------------------------------------------------------------
 # Regex extractors
 # ------------------------------------------------------------
+
 PART_ID_REGEX = r"(PS\d{5,})"
 MODEL_REGEX = r"\b([A-Za-z0-9]{4,}[A-Za-z0-9-]*)\b"
 MPN_REGEX = r"\b([A-Z][A-Z0-9]{4,})\b"
@@ -21,29 +24,31 @@ def extract_part_id(text: str) -> Optional[str]:
 
 def extract_model_number(text: str) -> Optional[str]:
     """
-    Try to capture model-like tokens (WDT780SAEM1, WRX735SDHZ04, etc.)
-    while avoiding PS part IDs.
+    Grab things that look like appliance model numbers:
+    - at least 6 chars
+    - mix of letters+digits
+    - but NOT PS part IDs
     """
     text_up = text.upper()
     candidates = re.findall(MODEL_REGEX, text_up)
     for c in candidates:
         if c.startswith("PS"):
             continue
-        if len(c) >= 6 and any(char.isdigit() for char in c):
+        if len(c) >= 6 and any(ch.isdigit() for ch in c):
             return c
     return None
 
 
 def extract_mpn(text: str) -> Optional[str]:
     """
-    Attempt to capture manufacturer part numbers like W10195416, 242126602, etc.
+    Manufacturer part numbers like W10321304, 242126602, etc.
     """
     text_up = text.upper()
     candidates = re.findall(MPN_REGEX, text_up)
     for token in candidates:
         if token.startswith("PS"):
             continue
-        if any(char.isdigit() for char in token):
+        if any(ch.isdigit() for ch in token):
             return token
     return None
 
@@ -65,6 +70,7 @@ def extract_appliance_type(text: str) -> Optional[str]:
 # ------------------------------------------------------------
 # Main routing
 # ------------------------------------------------------------
+
 def route_intent(user_message: str) -> RouteDecision:
     msg = user_message.lower().strip()
 
@@ -83,41 +89,50 @@ def route_intent(user_message: str) -> RouteDecision:
         model_number=model_number,
         manufacturer_part_number=manufacturer_part_number,
         brand=None,
-        missing_fields=[],
         order_id=order_id,
+        missing_fields=[],
     )
 
-    # -----------------------------
-    # 1. SMALL TALK
-    # -----------------------------
-    small_talk_keywords = ["hi", "hello", "thanks", "thank you", "hey"]
-    looks_like_small_talk = any(re.search(rf"\b{k}\b", msg) for k in small_talk_keywords)
-    if looks_like_small_talk and len(msg.split()) <= 4 and not (part_id or model_number or manufacturer_part_number):
-        return RouteDecision(
-            intent=Intent.SMALL_TALK,
-            normalized_query=user_message,
-            metadata=metadata,
-        )
+    # # -----------------------------
+    # # 1. SMALL TALK (short, no IDs)
+    # # -----------------------------
+    # small_talk_keywords = ["hi", "hello", "thanks", "thank you", "hey"]
+    # looks_like_small_talk = any(re.search(rf"\b{k}\b", msg) for k in small_talk_keywords)
+
+    # if looks_like_small_talk and len(msg.split()) <= 4 and not (
+    #     part_id or model_number or manufacturer_part_number or order_id
+    # ):
+    #     return RouteDecision(
+    #         intent=Intent.SMALL_TALK,
+    #         normalized_query=user_message,
+    #         metadata=metadata,
+    #         debug_reason="small_talk",
+    #     )
 
     # -----------------------------
-    # 2. ORDER SUPPORT
+    # 2. ORDER SUPPORT (fuzzy)
     # -----------------------------
-    if order_id or "order" in msg or "tracking" in msg:
+    if order_id or any(
+        k in msg
+        for k in ["order", "ordr", "oder", "oroder", "tracking", "track shipment", "track"]
+    ):
         return RouteDecision(
             intent=Intent.ORDER_SUPPORT,
             normalized_query=user_message,
             metadata=metadata,
+            debug_reason="order_support",
         )
 
-    # -----------------------------
-    # 3. POLICY
-    # -----------------------------
-    if any(k in msg for k in ["return policy", "return window", "policy", "why shop", "warranty"]):
-        return RouteDecision(
-            intent=Intent.POLICY,
-            normalized_query=user_message,
-            metadata=metadata,
-        )
+   # # -----------------------------
+    # # 3. POLICY
+    # # -----------------------------
+    # if any(k in msg for k in ["return policy", "return window", "policy", "why shop", "warranty"]):
+    #     return RouteDecision(
+    #         intent=Intent.POLICY,
+    #         normalized_query=user_message,
+    #         metadata=metadata,
+    #         debug_reason="policy",
+    #     )
 
     # -----------------------------
     # 4. COMPATIBILITY CHECK
@@ -125,7 +140,7 @@ def route_intent(user_message: str) -> RouteDecision:
     compat_keywords = ["compatible", "fit", "work with"]
     if any(k in msg for k in compat_keywords):
         missing = []
-        if not part_id:
+        if not (part_id):
             missing.append("part_id")
         if not model_number:
             missing.append("model_number")
@@ -136,32 +151,43 @@ def route_intent(user_message: str) -> RouteDecision:
                 intent=Intent.CLARIFICATION,
                 normalized_query=user_message,
                 metadata=metadata,
+                debug_reason="compat_missing_fields",
             )
 
         return RouteDecision(
             intent=Intent.COMPAT_CHECK,
             normalized_query=user_message,
             metadata=metadata,
+            debug_reason="compat_full",
         )
 
     # -----------------------------
-    # 5. PRODUCT INFO (any ID → SQL-first)
+    # 5. PRODUCT INFO (any ID)
     # -----------------------------
-    if part_id or manufacturer_part_number or model_number:
+    if part_id or manufacturer_part_number:
         return RouteDecision(
             intent=Intent.PRODUCT_INFO,
             normalized_query=user_message,
             metadata=metadata,
+            debug_reason="product_info_by_id_or_model",
         )
 
     # -----------------------------
-    # 6. REPAIR HELP (symptom detection)
+    # 6. REPAIR HELP (symptoms)
     # -----------------------------
     repair_keywords = [
-        "leak", "noisy", "won't start", "wont start", "not starting",
-        "not working", "not dispensing", "not making ice", "warm", "too warm",
-        "too cold", "smell", "error", "won't fill", "won't drain", "stuck",
-        "overflow", "flood", "dripping",
+        "leak", "leaking",
+        "noisy", "noise",
+        "won't start", "wont start", "not starting",
+        "not working", "stopped working",
+        "not dispensing", "not making ice",
+        "warm", "too warm", "not cooling", "not cold",
+        "freezing up", "icing up",
+        "smell", "odor",
+        "won't fill", "wont fill",
+        "won't drain", "wont drain",
+        "stuck", "jammed",
+        "overflow", "flooding",
     ]
 
     if any(k in msg for k in repair_keywords):
@@ -169,14 +195,18 @@ def route_intent(user_message: str) -> RouteDecision:
             intent=Intent.REPAIR_HELP,
             normalized_query=user_message,
             metadata=metadata,
+            debug_reason="repair_symptom_keywords",
         )
 
     # -----------------------------
-    # 7. BLOG HOW-TO / USAGE HELP
+    # 7. BLOG HOW-TO / USAGE
     # -----------------------------
     howto_keywords = [
-        "how to", "what is", "explain", "cycle", "mode", "eco", "settings",
-        "reset", "clean cycle", "sanitize cycle",
+        "how to", "how do i",
+        "what is", "what does",
+        "explain",
+        "cycle", "mode", "eco", "sanitize", "quick wash", "settings",
+        "reset", "clean cycle",
     ]
 
     if any(k in msg for k in howto_keywords):
@@ -184,6 +214,7 @@ def route_intent(user_message: str) -> RouteDecision:
             intent=Intent.BLOG_HOWTO,
             normalized_query=user_message,
             metadata=metadata,
+            debug_reason="usage_keywords",
         )
 
     # -----------------------------
@@ -193,4 +224,5 @@ def route_intent(user_message: str) -> RouteDecision:
         intent=Intent.OUT_OF_SCOPE,
         normalized_query=user_message,
         metadata=metadata,
+        debug_reason="fallback_out_of_scope",
     )

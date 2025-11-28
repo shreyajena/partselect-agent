@@ -1,3 +1,5 @@
+# app/agent/chat_agent.py
+
 from __future__ import annotations
 from sqlalchemy.orm import Session
 
@@ -9,14 +11,16 @@ from app.agent import handlers
 def handle_message(
     user_message: str,
     db: Session,
-    conversation_snippet: str | None = None,  # kept for FastAPI compatibility
+    conversation_snippet: str | None = None,  # kept for API compatibility
 ) -> str:
     """
     Main entrypoint for the chat agent.
 
-    - Classifies the message using the rule-based router (fast, no LLM)
+    - Routes the message using a lightweight, rule-based router
     - Dispatches to the appropriate handler
     - Returns a final natural-language answer
+
+    conversation_snippet is currently unused, but retained to avoid breaking the FastAPI endpoint.
     """
 
     decision: RouteDecision = route_intent(user_message)
@@ -49,7 +53,7 @@ def handle_message(
     if intent == Intent.CLARIFICATION:
         return handlers.handle_clarification(decision, db)
 
-    # Fallback (should rarely happen)
+    # Super defensive fallback
     return (
         "I’m not entirely sure how to handle that. "
         "I’m best at refrigerator and dishwasher parts, compatibility, and repair help. "
