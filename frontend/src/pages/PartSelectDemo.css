@@ -1,0 +1,169 @@
+/* PartSelect Demo Page Styles */
+.partselect-demo {
+  min-height: 100vh;
+  background-color: #F5F5F5;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Header */
+.demo-header {
+  background-color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.demo-header-top {
+  background-color: #0A6A63;
+  padding: 16px 0;
+}
+
+.demo-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.demo-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #FFFFFF;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.demo-house-icon {
+  font-size: 28px;
+  color: #D98B2B;
+}
+
+.demo-logo-text {
+  letter-spacing: -0.5px;
+}
+
+.demo-nav {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.demo-nav a {
+  color: #FFFFFF;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+
+.demo-nav a:hover {
+  opacity: 0.8;
+}
+
+.demo-support-ribbon {
+  background-color: #EFBF3F;
+  padding: 12px 0;
+  text-align: center;
+}
+
+.demo-support-ribbon span {
+  color: #333333;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Main Content */
+.demo-main {
+  padding: 40px 0;
+}
+
+.demo-content-card {
+  background-color: #FFFFFF;
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.demo-page-title {
+  font-size: 36px;
+  font-weight: 700;
+  color: #333333;
+  margin: 0 0 8px 0;
+}
+
+.demo-page-subtitle {
+  font-size: 18px;
+  color: #666666;
+  margin: 0 0 32px 0;
+}
+
+.demo-brands-grid {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.demo-brands-grid::-webkit-scrollbar {
+  height: 6px;
+}
+
+.demo-brands-grid::-webkit-scrollbar-thumb {
+  background-color: #0A6A63;
+  border-radius: 3px;
+}
+
+.demo-brand-card {
+  background-color: #F5F5F5;
+  border-radius: 12px;
+  padding: 32px 24px;
+  text-align: center;
+  transition: all 0.2s;
+  cursor: pointer;
+  border: 2px solid transparent;
+  min-width: 200px;
+  flex-shrink: 0;
+}
+
+.demo-brand-card:hover {
+  background-color: #FFFFFF;
+  border-color: #0A6A63;
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(10, 106, 99, 0.15);
+}
+
+.demo-brand-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.demo-brand-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333333;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .demo-nav {
+    display: none;
+  }
+
+  .demo-content-card {
+    padding: 24px;
+  }
+
+  .demo-page-title {
+    font-size: 28px;
+  }
+
+  .demo-brands-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 16px;
+  }
+
+  .demo-brand-card {
+    padding: 24px 16px;
+  }
+}
