@@ -19,6 +19,17 @@ def _escape_like(term: str) -> str:
         .replace("_", r"\_")
     )
 
+
+def _link_metadata(links: list[dict]) -> dict:
+    clean = [
+        link
+        for link in links
+        if link.get("label") and (link.get("url") or link.get("prompt"))
+    ]
+    if not clean:
+        return {}
+    return {"type": "links", "links": clean}
+
 logger = logging.getLogger(__name__)
 
 # =====================================================================
@@ -95,7 +106,7 @@ def llm_answer(system_prompt: str, user_prompt: str, context: str = "", max_retr
 #  RAG SHARED LOGIC (REPAIR / BLOG)
 # =====================================================================
 
-def _rag_answer(decision: RouteDecision, preferred_source: str) -> str:
+def _rag_answer(decision: RouteDecision, preferred_source: str) -> dict:
     docs = retrieve_documents(
         decision.normalized_query,
         top_k=6,
@@ -107,13 +118,20 @@ def _rag_answer(decision: RouteDecision, preferred_source: str) -> str:
     REPAIR_URL = "https://www.partselect.com/Repair/"
     INSTANT_REPAIRMAN_URL = "https://www.partselect.com/Instant-Repairman/"
 
+    link_meta = _link_metadata(
+        [
+            {"label": "Repair Guides", "url": REPAIR_URL},
+            {"label": "Instant Repairman", "url": INSTANT_REPAIRMAN_URL},
+        ]
+    )
+
     if not docs:
-        # fallback when vector store is empty or miss
-        return (
+        reply = (
             "I couldn't find enough local repair information for that. "
-            f"You can get detailed step-by-step help on PartSelect's repair pages: "
-            f"{REPAIR_URL} or the Instant Repairman tool: {INSTANT_REPAIRMAN_URL}"
+            "You can get detailed step-by-step help on PartSelect's repair pages "
+            "or use the Instant Repairman tool."
         )
+        return {"reply": reply, "metadata": link_meta}
 
     context = "\n\n---\n\n".join([d["text"] for d in docs])
 
@@ -137,23 +155,20 @@ Always mention that the advice comes from the PartSelect guides.
 If the context doesn't have enough information, keep your answer short.
 """
 
-
     # Get LLM response
     llm_response = llm_answer(system_prompt, decision.normalized_query, context)
-    
-    # Always append repair URLs
-    return (
+    reply = (
         f"{llm_response}\n\n"
-        f"For more detailed repair guides, visit: {REPAIR_URL}\n"
-        f"Or use our Instant Repairman tool: {INSTANT_REPAIRMAN_URL}"
+        "For more detailed repair guides, visit PartSelect's Repair page or use the Instant Repairman tool."
     )
 
+    return {"reply": reply, "metadata": link_meta}
 
 # ---------------------------------------------------------------------
 #  REPAIR HELP
 # ---------------------------------------------------------------------
 
-def handle_repair_help(decision: RouteDecision, db: Session) -> str:
+def handle_repair_help(decision: RouteDecision, db: Session) -> dict:
     return _rag_answer(decision, preferred_source="repairs")
 
 
@@ -161,7 +176,7 @@ def handle_repair_help(decision: RouteDecision, db: Session) -> str:
 #  BLOG / HOW-TO
 # ---------------------------------------------------------------------
 
-def handle_blog_howto(decision: RouteDecision, db: Session) -> str:
+def handle_blog_howto(decision: RouteDecision, db: Session) -> dict:
     return _rag_answer(decision, preferred_source="blogs")
 
 
@@ -186,7 +201,7 @@ def handle_product_info(decision: RouteDecision, db: Session) -> str:
             .first()
         )
 
-    # 3) Model-based lookup (optional, if you wired a relation).
+    # 3) Model-based lookup 
     if not part and decision.metadata.model_number:
         model_number = decision.metadata.model_number
         part = (
@@ -197,7 +212,7 @@ def handle_product_info(decision: RouteDecision, db: Session) -> str:
             .first()
         )
 
-    # 4) Very soft fallback: name fuzzy search.
+    # 4) Very soft fallback: name fuzzy search
     if not part:
         fuzzy_query = _escape_like(decision.normalized_query)
         part = (
@@ -253,7 +268,7 @@ Follow these rules depending on the user’s question:
 4) ALWAYS:
    - Keep the entire answer within 2–4 sentences.
    - Be friendly and conversational.
-   - End with: “You can confirm fit and see full details here: <URL>”.
+   - End with: “You can confirm fit and see full details here”.
 
 Keep it to 2–4 sentences total.
 
@@ -306,26 +321,37 @@ def resolve_part_identifier(db: Session, part_id: str | None, mpn: str | None):
     return None
 
 
-def handle_compat_check(decision: RouteDecision, db: Session) -> str:
+def handle_compat_check(decision: RouteDecision, db: Session) -> dict:
     part_id = decision.metadata.part_id
     mpn = decision.metadata.manufacturer_part_number
     model_number = decision.metadata.model_number
 
     if not (part_id or mpn) or not model_number:
-        return (
+        reply = (
             "To check compatibility I need both:\n"
             "- a PartSelect part ID (for example PS11752778) or manufacturer part number, and\n"
             "- your appliance model number (for example WDT780SAEM1)."
         )
+        metadata = _link_metadata(
+            [{"label": "Browse parts", "url": "https://www.partselect.com/"}]
+        )
+        return {"reply": reply, "metadata": metadata}
 
     # Resolve the part using either part_id or MPN
     part = resolve_part_identifier(db, part_id, mpn)
     if not part:
         identifier = part_id or mpn or "the part"
-        return (
+        reply = (
             f"I couldn't find {identifier} in my catalog. "
             "Please double-check the part number or share the PartSelect product page URL."
         )
+        metadata = _link_metadata(
+            [
+                {"label": "Browse parts", "url": "https://www.partselect.com/"},
+                {"label": "Contact support", "url": "https://www.partselect.com/Contact/#OrderPh"},
+            ]
+        )
+        return {"reply": reply, "metadata": metadata}
 
     # Check compatibility using the resolved part_id
     compat = (
@@ -339,11 +365,17 @@ def handle_compat_check(decision: RouteDecision, db: Session) -> str:
 
     if not compat:
         identifier = part_id or mpn or part.part_id
-        return (
+        reply = (
             f"I don't see {identifier} listed as compatible with model {model_number}. "
-            "Please double-check on the PartSelect product page "
-            "or with support before ordering."
+            "Please double-check on the PartSelect product page or with support before ordering."
         )
+        metadata = _link_metadata(
+            [
+                {"label": "View product", "url": part.product_url} if part.product_url else {},
+                {"label": "Contact support", "url": "https://www.partselect.com/Customer-Support/"},
+            ]
+        )
+        return {"reply": reply, "metadata": metadata}
 
     model = db.query(Model).filter(Model.model_number == model_number).one_or_none()
     identifier = part_id or mpn or part.part_id
@@ -352,12 +384,14 @@ def handle_compat_check(decision: RouteDecision, db: Session) -> str:
         f"Based on my compatibility data, part {identifier} (PartSelect ID: {part.part_id}) "
         f"is compatible with model {model_number}.",
     ]
-    if part and part.product_url:
-        reply_lines.append(f"You can review and buy it here: {part.product_url}")
+    links = []
+    if part.product_url:
+        links.append({"label": "View product", "url": part.product_url})
     if model and model.brand:
         reply_lines.append(f"Appliance brand: {model.brand}")
 
-    return "\n".join(reply_lines)
+    metadata = _link_metadata(links)
+    return {"reply": "\n".join(reply_lines), "metadata": metadata}
 
 
 # =====================================================================
@@ -444,7 +478,7 @@ def handle_order_support(decision: RouteDecision, db: Session) -> str:
 #  POLICY / WHY SHOP HERE (STATIC URLS)
 # =====================================================================
 
-def handle_policy(decision: RouteDecision, db: Session) -> str:
+def handle_policy(decision: RouteDecision, db: Session) -> dict:
     """
     Return static policy page URLs based on query keywords.
     Only handles policy information, not order return status.
@@ -453,32 +487,36 @@ def handle_policy(decision: RouteDecision, db: Session) -> str:
     
     # Map keywords to specific policy URLs
     # Only match explicit policy questions
-    if "return policy" in query_lower or "return window" in query_lower:
+    default_links = [
+        {"label": "Fast Shipping", "url": "https://www.partselect.com/Fast-Shipping.htm"},
+        {"label": "365-Day Returns", "url": "https://www.partselect.com/365-Day-Returns.htm"},
+        {"label": "One-Year Warranty", "url": "https://www.partselect.com/One-Year-Warranty.htm"},
+        {"label": "Price Match", "url": "https://www.partselect.com/Price-Match.htm"},
+    ]
+
+    if "policy" in query_lower or "return window" in query_lower:
         url = "https://www.partselect.com/365-Day-Returns.htm"
-        policy_name = "365-Day Returns"
+        reply = "You can review our 365-Day Returns policy online."
+        links = [{"label": "365-Day Returns", "url": url}]
     elif "warranty" in query_lower or "guarantee" in query_lower:
         url = "https://www.partselect.com/One-Year-Warranty.htm"
-        policy_name = "One-Year Warranty"
+        reply = "Here’s a quick look at our One-Year Warranty."
+        links = [{"label": "One-Year Warranty", "url": url}]
     elif "shipping" in query_lower or "fast shipping" in query_lower:
         url = "https://www.partselect.com/Fast-Shipping.htm"
-        policy_name = "Fast Shipping"
+        reply = "We offer fast shipping on many parts—details are below."
+        links = [{"label": "Fast Shipping", "url": url}]
     elif "price match" in query_lower:
         url = "https://www.partselect.com/Price-Match.htm"
-        policy_name = "Price Match"
+        reply = "We do offer price matching. See the guidelines:"
+        links = [{"label": "Price Match", "url": url}]
     else:
-        # Default: return all policy links
-        return (
-            "Here are our key policies:\n\n"
-            "• Fast Shipping: https://www.partselect.com/Fast-Shipping.htm\n"
-            "• 365-Day Returns: https://www.partselect.com/365-Day-Returns.htm\n"
-            "• One-Year Warranty: https://www.partselect.com/One-Year-Warranty.htm\n"
-            "• Price Match: https://www.partselect.com/Price-Match.htm"
+        reply = (
+            "Here are our key policies. Tap any link to learn more:"
         )
-    
-    return (
-        f"For information about our {policy_name} policy, please visit:\n"
-        f"{url}"
-    )
+        return {"reply": reply, "metadata": _link_metadata(default_links)}
+
+    return {"reply": reply, "metadata": _link_metadata(links)}
 
 
 # =====================================================================
@@ -513,7 +551,7 @@ def handle_clarification(decision: RouteDecision, db: Session) -> str:
         return (
             "I need a bit more information to help. "
             "Could you share which appliance this is for, the model number, "
-            "and any part IDs or a link to the PartSelect page?"
+            "and any Part IDs or a link to the PartSelect page?"
         )
 
     return "To help with that, please provide " + "; ".join(prompts) + "."

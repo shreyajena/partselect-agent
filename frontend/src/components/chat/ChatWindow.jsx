@@ -117,13 +117,18 @@ const ChatWindow = ({ isExpanded, setIsExpanded, onClose }) => {
       {/* Header */}
       <div className="chat-header">
         <div className="chat-header-left">
-          <img
-            src={psLogo}
-            alt="PartSelect logo"
-            className="partselect-logo-img"
-            draggable={false}
-          />
-          <div className="selecto-avatar">🤖</div>
+          <div className="chat-header-logo-wrapper">
+            <img
+              src={psLogo}
+              alt="PartSelect logo"
+              className="partselect-logo-img"
+              draggable={false}
+            />
+          </div>
+          <div className="selecto-avatar-wrapper">
+            <div className="selecto-avatar">🤖</div>
+            <div className="selecto-status-indicator"></div>
+          </div>
           <div className="chat-header-text">
             <div className="chat-title">Selecto — Your Parts Buddy</div>
             <div className="chat-subtitle">Ask me anything about dishwasher/refrigerator parts, repairs, or your order.</div>
@@ -134,15 +139,26 @@ const ChatWindow = ({ isExpanded, setIsExpanded, onClose }) => {
             className="chat-header-button"
             onClick={() => setIsExpanded(!isExpanded)}
             aria-label={isExpanded ? 'Minimize' : 'Expand'}
+            title={isExpanded ? 'Minimize' : 'Expand'}
           >
-            {isExpanded ? '⤡' : '⤢'}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              {isExpanded ? (
+                <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+              ) : (
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+              )}
+            </svg>
           </button>
           <button
             className="chat-header-button"
             onClick={onClose}
             aria-label="Close"
+            title="Close chat"
           >
-            ✕
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
           </button>
         </div>
       </div>
@@ -172,24 +188,49 @@ const ChatWindow = ({ isExpanded, setIsExpanded, onClose }) => {
 
       {/* Input Area */}
       <div className="chat-input-container">
-        <input
-          ref={inputRef}
-          type="text"
-          className="chat-input"
-          placeholder="Type your question…"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyPress={handleKeyPress}
-        />
+        <div className="chat-input-wrapper">
+          <input
+            ref={inputRef}
+            type="text"
+            className="chat-input"
+            placeholder="Type your question…"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyPress={handleKeyPress}
+            disabled={isTyping}
+          />
+          {inputValue.trim() && (
+            <button
+              className="chat-clear-button"
+              onClick={() => setInputValue('')}
+              aria-label="Clear input"
+              title="Clear"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          )}
+        </div>
         <button
-          className="chat-send-button"
+          className={`chat-send-button ${isTyping ? 'disabled' : ''}`}
           onClick={handleSend}
           aria-label="Send message"
+          disabled={isTyping || !inputValue.trim()}
+          title="Send message"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-          </svg>
+          {isTyping ? (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="spinning">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M12 6v6l4 2"></path>
+            </svg>
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          )}
         </button>
       </div>
     </div>
